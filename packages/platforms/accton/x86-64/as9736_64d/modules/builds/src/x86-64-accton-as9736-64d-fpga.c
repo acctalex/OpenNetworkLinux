@@ -1340,17 +1340,20 @@ static ssize_t port_status_read(struct device *dev,
 	case PCIE_FPGA_UDB_VERSION:
 		ret = sprintf(buf, 
 			"%d.%d\n", 
-			(fpga_ctl->udb_version>>8) & 0xf,
-			fpga_ctl->udb_version & 0xf);
+			(fpga_ctl->udb_version>>8) & 0x7f,
+			fpga_ctl->udb_version & 0xff);
 		break;
 	case PCIE_FPGA_LDB_VERSION:
 		ret = sprintf(buf, 
 			"%d.%d\n", 
-			(fpga_ctl->ldb_version>>8) & 0xf, 
-			fpga_ctl->ldb_version & 0xf);
+			(fpga_ctl->ldb_version>>8) & 0x7f, 
+			fpga_ctl->ldb_version & 0xff);
 		break;
 	case PCIE_FPGA_SMB_VERSION:
-		ret = sprintf(buf, "%d.%d\n", (fpga_ctl->smb_version>>8) & 0xf, fpga_ctl->smb_version & 0xf);
+		ret = sprintf(buf, 
+			"%d.%d\n", 
+			(fpga_ctl->smb_version>>8) & 0x7f, 
+			fpga_ctl->smb_version & 0xff);
 		break;
 	default:
 		ret = -EINVAL;
