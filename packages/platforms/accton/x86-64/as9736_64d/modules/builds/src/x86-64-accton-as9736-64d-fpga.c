@@ -1406,7 +1406,7 @@ static ssize_t port_status_write(struct device *dev, struct device_attribute *da
 			!!value); /*bit3 and bit11*/
 		break;
 	default:
-		mutex_lock(&update_lock);
+		mutex_unlock(&update_lock);
 		return  -EINVAL;
 	}
 
