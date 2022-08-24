@@ -29,6 +29,7 @@
 #include <linux/hwmon-sysfs.h>
 #include <linux/delay.h>
 #include <linux/pci.h>
+#include <linux/time64.h>
 
 /***********************************************
  *       variable define
@@ -54,6 +55,13 @@
 #define SFP_LDB_GPIO1_DATA_EN         0x1000
 #define SFP_LDB_GPIO1_DATA_OUT        0x1004
 #define SFP_LDB_GPIO1_DATA_IN         0x1008
+
+#define ASLPC_DEV_UDB_CPLD1_PCIE_START_OFFST 0x400
+#define ASLPC_DEV_UDB_CPLD2_PCIE_START_OFFST 0x500
+#define ASLPC_DEV_LDB_CPLD1_PCIE_START_OFFST 0x400
+#define ASLPC_DEV_LDB_CPLD2_PCIE_START_OFFST 0x500
+#define ASLPC_DEV_SMB_CPLD_PCIE_START_OFFST  0x200
+
 #define   BIT(x)                      x
 #define   SFP_PORT0_TXDIS(x)          ((x) >> (11))
 #define   SFP_PORT0_ABS(x)            ((x) >> (10))
@@ -120,6 +128,7 @@
 #define OPTOE_WRITE_OP          1
 #define OPTOE_EOF               0  /* used for access beyond end of device */
 #define TWO_ADDR_0X51           0x51
+#define EEPROM_ALLOW_SET_LEN    1
 
 /*
  * flags to distinguish one-address (QSFP family) from two-address (SFP family)
@@ -144,6 +153,10 @@
 #define PCIE_FPGA_I2C_MAX_LEN                     128
 #define PCIE_FPGA_I2C_NEW_TRIGGER_VALUE           0x80000000
 
+/* Show system date time */
+#define DATETIME_LEN  50
+char g_datetime[DATETIME_LEN];
+
 /***********************************************
  *       structure & variable declare
  * *********************************************/
@@ -158,6 +171,8 @@ typedef struct pci_fpga_device_s {
 	u32  qsfp_reset;
 	u32  sfp_input_data;
 	u32  sfp_output_data;
+	u16  aslpc_cpld1_offset;
+	u16  aslpc_cpld2_offset;
 } pci_fpga_device_t;
 
 /*fpga port status*/
@@ -217,7 +232,7 @@ struct pcie_fpga_dev_platform_data {
 	.dev                    = {                                      \
 		.platform_data 		= &pcie_udb_dev_platform_data[c],\
 		.release 		= device_release,                \
-        },                                                               \
+	},                                                               \
 }
  /*c from 1*/
 #define pcie_udb_qsfp_platform_data_init(c){                             \
@@ -800,7 +815,7 @@ static struct platform_device pcie_ldb_qsfp_device[] = {
 static SENSOR_DEVICE_ATTR(module_present_all, S_IRUGO, port_status_read, \
 			  NULL, MODULE_PRESENT_ALL);
 static SENSOR_DEVICE_ATTR(module_rx_los_all, S_IRUGO, port_status_read, NULL, \
-                          MODULE_RXLOS_ALL);
+			  MODULE_RXLOS_ALL);
 
 /* transceiver attributes */
 DECLARE_TRANSCEIVER_SENSOR_DEVICE_ATTR(1);
@@ -988,6 +1003,27 @@ static const struct attribute_group fpga_eeprom_group = {
 	.attrs = fpga_eeprom_attributes,
 };
 
+static char *show_date_time(void)
+{
+	struct timespec64 tv;
+	struct tm tm_val;
+
+	memset(g_datetime, 0, DATETIME_LEN);
+
+	ktime_get_real_ts64(&tv);
+	time64_to_tm(tv.tv_sec, 0, &tm_val);
+	sprintf(g_datetime, "[%04d/%02d/%02d-%02d:%02d:%02d.%06ld]",
+	1900 + tm_val.tm_year,
+	tm_val.tm_mon + 1,
+	tm_val.tm_mday,
+	tm_val.tm_hour,
+	tm_val.tm_min,
+	tm_val.tm_sec,
+	tv.tv_nsec/1000); /*usec*/
+
+	return g_datetime;
+}
+
 static ssize_t fpga_read_sfp_ddm_status_value(struct bin_attribute *eeprom)
 {
 	u32 reg_val = 0;
@@ -1006,7 +1042,7 @@ static ssize_t fpga_read_sfp_ddm_status_value(struct bin_attribute *eeprom)
 		if( fpga_i2c_ready_to_read(eeprom, EEPROM_LOWER_PAGE, 
 					pdata->i2c_slave_addr) != 1)
 			return 0;
-        
+
 		msleep(1);
 		addr = ioremap(pdata->base_addr + (pdata->i2c_rtc_read_data + 
 				TWO_ADDR_PAGEABLE_REG), 32);
@@ -1027,7 +1063,8 @@ static ssize_t fpga_read_sfp_ddm_status_value(struct bin_attribute *eeprom)
 		ddm_support = (reg_val) & 0xff;  /*check on bit6*/
 
 		pdata->pageable = (pageable & TWO_ADDR_PAGEABLE ) ? 1 : 0;
-		pdata->sfp_support_a2 = (ddm_support & TWO_ADDR_0X51_SUPP) ? 1 : 0;
+		pdata->sfp_support_a2 = (ddm_support & TWO_ADDR_0X51_SUPP) 
+					? 1 : 0;
 	}
 
 	return 0;
@@ -1073,15 +1110,18 @@ static ssize_t fpga_read_port_status_value(struct bin_attribute *eeprom)
 	}
 
 	/*get version*/
-	addr = ioremap(fpga_ctl->pci_fpga_dev[PCI_SUBSYSTEM_ID_UDB].base_addr, 32);
+	addr = ioremap(fpga_ctl->pci_fpga_dev[PCI_SUBSYSTEM_ID_UDB].base_addr, 
+		32);
 	fpga_ctl->udb_version = ioread32(addr);
 	iounmap(addr);
 
-	addr = ioremap(fpga_ctl->pci_fpga_dev[PCI_SUBSYSTEM_ID_LDB].base_addr, 32);
+	addr = ioremap(fpga_ctl->pci_fpga_dev[PCI_SUBSYSTEM_ID_LDB].base_addr, 
+		32);
 	fpga_ctl->ldb_version = ioread32(addr);
 	iounmap(addr);
 
-	addr = ioremap(fpga_ctl->pci_fpga_dev[PCI_SUBSYSTEM_ID_SMB].base_addr, 32);
+	addr = ioremap(fpga_ctl->pci_fpga_dev[PCI_SUBSYSTEM_ID_SMB].base_addr, 
+		32);
 	fpga_ctl->smb_version = ioread32(addr);
 	iounmap(addr);
 
@@ -1111,25 +1151,25 @@ static ssize_t fpga_write_port_value(int fpga_type, int set_type, int bit_num,
 		val_set = reg_val & ~(1<<bit_num);
 
 	switch(set_type) {
-        case PCIE_FPGA_SET_LPMODE:
+	case PCIE_FPGA_SET_LPMODE:
 		addr = ioremap(fpga_ctl->pci_fpga_dev[fpga_type].base_addr +
 				QSFP_LPMODE_REG_OFFSET, 32);
 		iowrite32(val_set, addr);
 		iounmap(addr);
 		break;
-        case PCIE_FPGA_SET_RESET:
+	case PCIE_FPGA_SET_RESET:
 		addr = ioremap(fpga_ctl->pci_fpga_dev[fpga_type].base_addr +
 				QSFP_RESET_REG_OFFSET, 32);
 		iowrite32(val_set, addr);
 		iounmap(addr);
 		break;
-        case PCIE_FPGA_SET_TX_DISABLE:
+	case PCIE_FPGA_SET_TX_DISABLE:
 		addr = ioremap(fpga_ctl->pci_fpga_dev[fpga_type].base_addr + 
 				SFP_LDB_GPIO1_DATA_OUT, 32);
 		iowrite32(val_set, addr);
 		iounmap(addr);
-        	break;
-        default:
+		break;
+	default:
 		break;
 	}
 
@@ -1402,7 +1442,8 @@ static ssize_t port_status_write(struct device *dev, struct device_attribute *da
 		break;
 	case MODULE_TX_DISABLE_65 ... MODULE_TX_DISABLE_66:
 		fpga_write_port_value(PCIE_FPGA_LDB, PCIE_FPGA_SET_TX_DISABLE, 
-			((attr->index - MODULE_TX_DISABLE_65) ? BIT(3) : BIT(11)), 
+			((attr->index - MODULE_TX_DISABLE_65) 
+			? BIT(3) : BIT(11)), 
 			!!value); /*bit3 and bit11*/
 		break;
 	default:
@@ -1479,6 +1520,7 @@ static int fpga_i2c_ready_to_read(struct bin_attribute *attr,
 				int page_type, int i2c_slave_addr)
 {
 	int  cnt = 0;
+	int  chk_state_cnt = 0;
 	u32  i2c_new_trigger_val = 0;
 	u32  flag = 0;
 	void __iomem *addr = NULL;
@@ -1526,74 +1568,90 @@ static int fpga_i2c_ready_to_read(struct bin_attribute *attr,
 		flag = ioread32(addr);
 		iounmap(addr);
 		if(flag == 0) {
-			msleep(1);
+			/*In normal case:
+			observed chk_state_cnt(10~120) times can get i2c rtc0 done status. */
+			if( chk_state_cnt > 500 ) {
+				flag = -EAGAIN;
+				break;
+			}
+			usleep_range(50, 100);
+			chk_state_cnt++;
 			continue;
-		}
-		else {
+		} else {
 			break;
 		}
 	}
+	msleep(1);
 
 	return flag;
 }
 
-static int fpga_i2c_page_change(struct bin_attribute *attr, int page_no,
-				int i2c_slave_addr)
+static int fpga_i2c_set_data(struct bin_attribute *attr, loff_t offset, char *data, int i2c_slave_addr)
 {
 	int cnt = 0;
+	int chk_state_cnt = 0;
 	struct eeprom_bin_private_data *pdata = NULL;
 	void __iomem *addr = NULL;
-	u32 flag = 0;
-	u32 i2c_new_trigger_val = 0;
+	u32  flag = 0;
+	u32  i2c_new_trigger_val = 0;
 
 	pdata = attr->private;
 
-	/* Select i2c protocol profile */
+	/*Select i2c protocol profile*/
 	addr = ioremap(pdata->base_addr + pdata->i2c_mgmt_rtc0_profile, 32);
 	iowrite32(0x0, addr);
 	iounmap(addr);
 
-	/* write page_no */
-	for( cnt=0 ; cnt < (PCIE_FPGA_I2C_MAX_LEN/4); cnt++) {
+	/*clean read data*/
+	for(cnt=0 ; cnt < (PCIE_FPGA_I2C_MAX_LEN/4); cnt++){
 		addr = ioremap(pdata->base_addr + 
 			( pdata->i2c_rtc_write_data + (4 * cnt) ), 32);
 		iowrite32(0x0, addr);
 		iounmap(addr);
 	}
+
+	/* Prepare date to set into data registor*/
 	addr = ioremap(pdata->base_addr + pdata->i2c_rtc_write_data, 32);
-	iowrite32(page_no, addr);
+	iowrite32(data[0], addr);
 	iounmap(addr);
 
-	/* clean done status */
+	/*clean done status*/
 	addr = ioremap(pdata->base_addr + pdata->i2c_contrl_rtc0_stats, 32);
 	iowrite32(0x3, addr);
 	iounmap(addr);
 
-	/* set write slave addr */
+	/*set write slave addr*/
 	addr = ioremap(pdata->base_addr + pdata->i2c_contrl_rtc0_config_0, 32);
-	iowrite32(0x00000001|(i2c_slave_addr << 8), addr);
+	iowrite32( EEPROM_ALLOW_SET_LEN | (i2c_slave_addr << 8), addr);
 	iounmap(addr);
 
-	/* triger */
-	i2c_new_trigger_val = PCIE_FPGA_I2C_NEW_TRIGGER_VALUE +
-				OPTOE_PAGE_SELECT_REG;
+	/*triger*/
+	i2c_new_trigger_val = PCIE_FPGA_I2C_NEW_TRIGGER_VALUE + offset;
 	addr = ioremap(pdata->base_addr + pdata->i2c_contrl_rtc0_config_1, 32);
 	iowrite32(i2c_new_trigger_val, addr);
 	iounmap(addr);
 
-	/* read done status */
+	/*read done status*/
 	addr = ioremap(pdata->base_addr + pdata->i2c_contrl_rtc0_stats, 32);
 
-	while( 1 ) {
+	while(1) {
 		flag = ioread32(addr);
 		if(flag == 0) {
-			msleep(1);
+		/*In normal case:
+		observed chk_state_cnt(10~120) times can get i2c rtc0 done status. */
+			if(chk_state_cnt > 500) {
+				flag = -EAGAIN;
+				break;
+			}
+			usleep_range(50, 100);
+			chk_state_cnt++;
 			continue;
 		} else {
 			break;
 		}
 	}
 	iounmap(addr);
+	msleep(1);
 
 	return flag;
 }
@@ -1662,11 +1720,13 @@ static int get_port_present_status(struct bin_attribute *attr)
 }
 
 static ssize_t
-_sfp_bin_read(struct file *filp, struct kobject *kobj,
-	struct bin_attribute *attr,
-	char *buf, loff_t off, size_t count, int *page)
+sfp_eeprom_read(struct file *filp, struct kobject *kobj,
+             struct bin_attribute *attr,
+             char *buf, loff_t off, size_t count, int *page)
 {
+	int state = 0;
 	int page_num, slice;
+	char set_page_num[1] = {0};
 	struct eeprom_bin_private_data *pdata = NULL;
 	pdata = attr->private;
 
@@ -1679,63 +1739,68 @@ _sfp_bin_read(struct file *filp, struct kobject *kobj,
 	if ((off + count) > (slice * OPTOE_PAGE_SIZE + OPTOE_PAGE_SIZE))
 		count = slice * OPTOE_PAGE_SIZE + OPTOE_PAGE_SIZE - off;
 
-	if(slice == 0) {
-		if(fpga_i2c_ready_to_read(attr, EEPROM_LOWER_PAGE, 
-					pdata->i2c_slave_addr) != 1)
-			goto exit_emtpy;
+	if(slice == 0){
+		if((state = fpga_i2c_ready_to_read(attr, EEPROM_LOWER_PAGE, 
+			pdata->i2c_slave_addr)) != 1)
+			goto exit_err;
 
 		byte_cnt = fpga_i2c_read_data(attr, &data[0]);
-	} else if(slice == 1) {
-		if(fpga_i2c_ready_to_read(attr, EEPROM_UPPER_PAGE,
-					pdata->i2c_slave_addr) != 1)
-			goto exit_emtpy;
+	} else if(slice == 1){
+		if((state = fpga_i2c_ready_to_read(attr, EEPROM_UPPER_PAGE, 
+			pdata->i2c_slave_addr)) != 1)
+			goto exit_err;
 
 		byte_cnt = fpga_i2c_read_data(attr, &data[0]);
 	} else {
 		page_num = slice - 1;
-		if(pdata->port_num <= FPGA_QSFP_PORT_NUM) { /*qsfp page1~0xff*/
-			if(fpga_i2c_page_change(attr, page_num,
-						pdata->i2c_slave_addr) != 1)
-				goto exit_emtpy;
+		if( pdata->port_num <= FPGA_QSFP_PORT_NUM){ /*qsfp page1~0xff*/
+			set_page_num[0] = page_num;
+			if( (state = fpga_i2c_set_data(attr, 
+				OPTOE_PAGE_SELECT_REG, set_page_num, 
+				pdata->i2c_slave_addr)) != 1)
+				goto exit_err;
 
-			msleep(1);
-			if(fpga_i2c_ready_to_read(attr, EEPROM_UPPER_PAGE,
-						pdata->i2c_slave_addr) != 1)
-				goto exit_emtpy;
+			if((state = fpga_i2c_ready_to_read(attr, 
+				EEPROM_UPPER_PAGE, 
+				pdata->i2c_slave_addr)) != 1)
+				goto exit_err;
 
 			byte_cnt = fpga_i2c_read_data(attr, &data[byte_cnt]);
 			*page = page_num;
-		} else { /*sfp support a2(0x51), cat behind a0(0x50)*/
-			if(page_num == 1) { /*a2 lower page*/
-				if(fpga_i2c_ready_to_read(attr,
-					EEPROM_LOWER_PAGE, TWO_ADDR_0X51) != 1)
-					goto exit_emtpy;
+		} else {/*sfp support a2(0x51), cat behind a0(0x50)*/
+			if(page_num == 1){ /*a2 lower page*/
+				if((state = fpga_i2c_ready_to_read(attr, 
+					EEPROM_LOWER_PAGE, 
+					TWO_ADDR_0X51)) != 1)
+					goto exit_err;
 
 				byte_cnt = fpga_i2c_read_data(attr, &data[0]);
-			}
-			else if (page_num == 2) {  /*a2 page0*/
-				if(fpga_i2c_page_change(attr, 0, 
-						TWO_ADDR_0X51) != 1)
-					goto exit_emtpy;
+			} else if (page_num == 2){ /*a2 page0*/
+				set_page_num[0] = 0;
+				if((state = fpga_i2c_set_data(attr, 
+					OPTOE_PAGE_SELECT_REG, set_page_num,
+					TWO_ADDR_0X51))!=1)
+					goto exit_err;
 
-				msleep(1);
-				if(fpga_i2c_ready_to_read(attr,
-					EEPROM_UPPER_PAGE, TWO_ADDR_0X51) != 1)
-					goto exit_emtpy;
+				if((state = fpga_i2c_ready_to_read(attr, 
+					EEPROM_UPPER_PAGE, TWO_ADDR_0X51)) != 1)
+					goto exit_err;
 
 				byte_cnt = fpga_i2c_read_data(attr, &data[0]);
 			} else {
-				if(fpga_i2c_page_change(attr, (page_num-2),
-					TWO_ADDR_0X51) != 1) /*set page from 1*/
-					goto exit_emtpy;
+				set_page_num[0] = page_num - 2;
+				if((state = fpga_i2c_set_data(attr, 
+					OPTOE_PAGE_SELECT_REG, set_page_num,
+					TWO_ADDR_0X51) != 1)) /*set page from 1*/
+					goto exit_err;
 
-				msleep(1);
+				if((state = fpga_i2c_ready_to_read(attr, 
+					EEPROM_UPPER_PAGE, 
+					TWO_ADDR_0X51)) != 1)
+					goto exit_err;
 
-				if(fpga_i2c_ready_to_read(attr,
-					EEPROM_UPPER_PAGE, TWO_ADDR_0X51) != 1 )
-					goto exit_emtpy;
-
-				byte_cnt = fpga_i2c_read_data(attr, &data[byte_cnt]);
+				byte_cnt = fpga_i2c_read_data(attr, 
+						&data[byte_cnt]);
 				*page = page_num-2;
 			}
 		}
@@ -1744,8 +1809,9 @@ _sfp_bin_read(struct file *filp, struct kobject *kobj,
 
 	return count;
 
-exit_emtpy:
-	pcie_err("ERROR: Port%d pcie get failed!!", pdata->port_num);
+exit_err:
+	pcie_err("%s ERROR(%d): Port%d pcie get done status failed!!", show_date_time(), state, pdata->port_num);
+
 	return -EBUSY;
 }
 
@@ -1755,7 +1821,9 @@ static ssize_t sfp_bin_read(struct file *filp, struct kobject *kobj,
 {
 	int present;
 	int page = 0;
+	int state = 0;
 	int i2c_slave_addr;
+	char set_page_num[1] ={0};
 	ssize_t retval = 0;
 	struct eeprom_bin_private_data *pdata = NULL;
 	pdata = attr->private;
@@ -1780,7 +1848,8 @@ static ssize_t sfp_bin_read(struct file *filp, struct kobject *kobj,
 	while (count) {
 		ssize_t status;
 
-		status = _sfp_bin_read(filp, kobj, attr, buf, off, count, &page);
+		status = sfp_eeprom_read(filp, kobj, attr, buf, off, count, 
+						&page);
 		if (status <= 0) {
 			if (retval == 0)
 				retval = status;
@@ -1805,18 +1874,73 @@ static ssize_t sfp_bin_read(struct file *filp, struct kobject *kobj,
 		(pdata->port_num > FPGA_QSFP_PORT_NUM) ? 
 					TWO_ADDR_0X51 : pdata->i2c_slave_addr;
 
-		if(fpga_i2c_page_change(attr, 0, i2c_slave_addr) != 1) {
-			pcie_err("ERROR: Port%d pcie get failed!!", 
-				pdata->port_num);
+		if((state = fpga_i2c_set_data(attr, OPTOE_PAGE_SELECT_REG, 
+			set_page_num, i2c_slave_addr)) != 1) { /*set page to 0*/
 			mutex_unlock(&update_lock);
-			return -EBUSY;
+			goto exit_err;
 		}
-		msleep(1);
 	}
-
 	mutex_unlock(&update_lock);
 
 	return retval;
+
+exit_err:
+	pcie_err("%s ERROR(%d): Port%d pcie get done status failed!!", show_date_time(), state, pdata->port_num);
+
+	return -EBUSY;
+}
+
+static ssize_t
+sfp_eeprom_write(struct bin_attribute *attr, char *buf, loff_t off, 
+	size_t count)
+{
+	int state = 0;
+	struct eeprom_bin_private_data *pdata = NULL;
+	pdata = attr->private;
+
+	if((state = fpga_i2c_set_data(attr, off, buf, 
+					pdata->i2c_slave_addr)) != 1)
+		goto exit_err;
+
+	return count;
+
+exit_err:
+	pcie_err("%s ERROR(%d): Port%d pcie set failed!!", show_date_time(), state, pdata->port_num);
+
+	return -EBUSY;
+}
+
+static ssize_t sfp_bin_write(struct file *filp, struct kobject *kobj,
+                             struct bin_attribute *attr,
+                             char *buf, loff_t off, size_t count)
+{
+	int present;
+	ssize_t status = 0;
+
+	if (unlikely(!count) ||
+		likely(count > EEPROM_ALLOW_SET_LEN))//only allow count = 1
+		return count;
+
+	mutex_lock(&update_lock);
+
+	present = get_port_present_status(attr);
+	if( !present ) { /*unpresent*/
+		mutex_unlock(&update_lock);
+		return -ENODEV;
+	}
+	mutex_unlock(&update_lock);
+
+	/*
+	 * Write data to chip, protecting against concurrent updates
+	 * from this host.
+	 */
+	mutex_lock(&update_lock);
+
+	status = sfp_eeprom_write(attr, buf, off, count);
+
+	mutex_unlock(&update_lock);
+
+	return status;
 }
 
 static int check_qsfp_eeprom_pageable(struct bin_attribute *eeprom)
@@ -1869,6 +1993,7 @@ static int sfp_sysfs_eeprom_init(struct kobject *kobj,
 	eeprom->attr.name   = EEPROM_SYSFS_NAME;
 	eeprom->attr.mode   = S_IWUSR | S_IRUGO;
 	eeprom->read        = sfp_bin_read;
+	eeprom->write       = sfp_bin_write;
 
 	mutex_lock(&update_lock);
 
@@ -1912,6 +2037,7 @@ static int as9736_64d_pcie_fpga_stat_probe (struct platform_device *pdev)
 	int find_flag = 0; /*UDB and LDB*/
 	struct pci_dev *pcidev, *pcidev_from;
 	int err = 0;
+	int fpga_no = 0;
 
 	u16 id16 = 0;
 	u32 val32;
@@ -1937,7 +2063,6 @@ static int as9736_64d_pcie_fpga_stat_probe (struct platform_device *pdev)
 			status = -ENODEV;
 			goto exit_pci;
 		}
-
 		pcie_info("Found PCI Device: %s", FPGA_NAME[id16]);
 
 		if (pci_read_config_dword(pcidev, PCI_BASE_ADDRESS_0, 
@@ -1951,18 +2076,24 @@ static int as9736_64d_pcie_fpga_stat_probe (struct platform_device *pdev)
 			fpga_ctl->pci_fpga_dev[PCI_SUBSYSTEM_ID_UDB].base_addr = val32;
 			fpga_ctl->pci_fpga_dev[PCI_SUBSYSTEM_ID_UDB].size = 32;
 			fpga_ctl->pci_fpga_dev[PCI_SUBSYSTEM_ID_UDB].id = PCI_SUBSYSTEM_ID_UDB;
+			fpga_ctl->pci_fpga_dev[PCI_SUBSYSTEM_ID_UDB].aslpc_cpld1_offset = ASLPC_DEV_UDB_CPLD1_PCIE_START_OFFST;
+    			fpga_ctl->pci_fpga_dev[PCI_SUBSYSTEM_ID_UDB].aslpc_cpld2_offset = ASLPC_DEV_UDB_CPLD2_PCIE_START_OFFST;
 			find_flag++;
 			break;
 		case PCI_SUBSYSTEM_ID_LDB:
 			fpga_ctl->pci_fpga_dev[PCI_SUBSYSTEM_ID_LDB].base_addr = val32;
 			fpga_ctl->pci_fpga_dev[PCI_SUBSYSTEM_ID_LDB].size = 32;
 			fpga_ctl->pci_fpga_dev[PCI_SUBSYSTEM_ID_LDB].id = PCI_SUBSYSTEM_ID_LDB;
+    			fpga_ctl->pci_fpga_dev[PCI_SUBSYSTEM_ID_LDB].aslpc_cpld1_offset = ASLPC_DEV_LDB_CPLD1_PCIE_START_OFFST;
+   			fpga_ctl->pci_fpga_dev[PCI_SUBSYSTEM_ID_LDB].aslpc_cpld2_offset = ASLPC_DEV_LDB_CPLD2_PCIE_START_OFFST;
 			find_flag++;
 			break;
 		case PCI_SUBSYSTEM_ID_SMB:
 			fpga_ctl->pci_fpga_dev[PCI_SUBSYSTEM_ID_SMB].base_addr = val32;
 			fpga_ctl->pci_fpga_dev[PCI_SUBSYSTEM_ID_SMB].size = 32;
 			fpga_ctl->pci_fpga_dev[PCI_SUBSYSTEM_ID_SMB].id = PCI_SUBSYSTEM_ID_SMB;
+   			fpga_ctl->pci_fpga_dev[PCI_SUBSYSTEM_ID_SMB].aslpc_cpld1_offset = ASLPC_DEV_SMB_CPLD_PCIE_START_OFFST;
+			fpga_ctl->pci_fpga_dev[PCI_SUBSYSTEM_ID_SMB].aslpc_cpld2_offset = 0;
 			break;
 		default:
 			status = -ENODEV;
@@ -1984,6 +2115,49 @@ static int as9736_64d_pcie_fpga_stat_probe (struct platform_device *pdev)
 			SFP_LDB_GPIO1_DATA_EN, 32);
 	iowrite32(0x707, addr);
 	iounmap(addr);
+
+	/* Init port Enable >> LDB/UDB (0 >> 1) */
+	for(fpga_no = PCI_SUBSYSTEM_ID_LDB; fpga_no >= PCI_SUBSYSTEM_ID_UDB;
+		fpga_no--){
+		for(cnt = 0; cnt <= 1; cnt++) {
+			addr = ioremap(fpga_ctl->pci_fpga_dev[fpga_no].base_addr +
+			  fpga_ctl->pci_fpga_dev[fpga_no].aslpc_cpld1_offset + 
+			  0xb0 + cnt, 32);
+			iowrite8(0xff, addr);
+			iounmap(addr);
+		}
+		for(cnt = 0; cnt <= 1; cnt++) {
+			addr = ioremap(fpga_ctl->pci_fpga_dev[fpga_no].base_addr +
+ 			  fpga_ctl->pci_fpga_dev[fpga_no].aslpc_cpld2_offset +
+ 			  0xb0 + cnt, 32);
+			iowrite8(0xff, addr);
+			iounmap(addr);
+		}
+	}
+	/* Init present >> LDB/UDB (1 >> 0) */
+	for(fpga_no = PCI_SUBSYSTEM_ID_LDB; fpga_no >= PCI_SUBSYSTEM_ID_UDB; 
+		fpga_no--){
+		for(cnt = 0; cnt <= 1; cnt++){
+			addr = ioremap(fpga_ctl->pci_fpga_dev[fpga_no].base_addr +
+			fpga_ctl->pci_fpga_dev[fpga_no].aslpc_cpld1_offset + 
+			0xb8 + cnt, 32);
+			iowrite8(0x0, addr);
+			iounmap(addr);
+		}
+		for(cnt = 0; cnt <= 1; cnt++) {
+			addr = ioremap(fpga_ctl->pci_fpga_dev[fpga_no].base_addr +
+			fpga_ctl->pci_fpga_dev[fpga_no].aslpc_cpld2_offset + 
+			0xb8 + cnt, 32);
+			iowrite8(0x0, addr);
+			iounmap(addr);
+		}
+	}
+	/* Init 2XSFP Port Eanble & Present */
+	addr = ioremap(fpga_ctl->pci_fpga_dev[PCI_SUBSYSTEM_ID_LDB].base_addr +
+		fpga_ctl->pci_fpga_dev[PCI_SUBSYSTEM_ID_LDB].aslpc_cpld1_offset 
+		+ 0xbd, 32);
+		iowrite8(0x3, addr);
+		iounmap(addr);
 
 	return 0;
 
