@@ -1828,16 +1828,37 @@ exit_err:
 }
 
 static ssize_t
-sfp_eeprom_write(struct bin_attribute *attr, char *buf, loff_t off, 
-	size_t count)
+sfp_eeprom_write(struct bin_attribute *attr, char *buf, loff_t off, size_t count)
 {
 	int state = 0;
+	int page_num, slice, offset;
+	char set_page_num[1] = {0};
 	struct eeprom_bin_private_data *pdata = NULL;
 	pdata = attr->private;
 
-	if((state = fpga_i2c_set_data(attr, off, buf, 
-					pdata->i2c_slave_addr)) != 1)
+	slice = off / OPTOE_PAGE_SIZE;
+	page_num = slice - 1;
+	offset = off;
+
+	if(page_num > 0){
+		set_page_num[0] = page_num;
+		if((state = fpga_i2c_set_data(attr, OPTOE_PAGE_SELECT_REG, 
+				set_page_num, pdata->i2c_slave_addr)) != 1)
+			goto exit_err;
+
+		offset = OPTOE_PAGE_SIZE + (off % OPTOE_PAGE_SIZE);
+	}
+
+	if((state = fpga_i2c_set_data(attr, offset, buf, 
+			pdata->i2c_slave_addr)) != 1)
 		goto exit_err;
+
+	if(page_num > 0){
+		set_page_num[0] = 0;
+		if((state = fpga_i2c_set_data(attr, OPTOE_PAGE_SELECT_REG, 
+				set_page_num, pdata->i2c_slave_addr)) != 1)
+			goto exit_err;
+	}
 
 	return count;
 
