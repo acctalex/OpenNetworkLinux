@@ -220,7 +220,7 @@ static int es7636bt4_psu_read_block(struct i2c_client *client, u8 command,
 			continue;
 		}
 
-`		result = 0;
+		result = 0;
 		break;
 	}
 

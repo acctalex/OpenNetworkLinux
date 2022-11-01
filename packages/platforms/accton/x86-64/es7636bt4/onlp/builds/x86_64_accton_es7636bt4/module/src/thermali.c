@@ -46,6 +46,7 @@ enum onlp_thermal_id
 	THERMAL_2_ON_MAIN_BROAD,
 	THERMAL_3_ON_MAIN_BROAD,
 	THERMAL_4_ON_MAIN_BROAD,
+	THERMAL_5_ON_MAIN_BROAD,
 	THERMAL_1_ON_PSU1,
 	THERMAL_1_ON_PSU2,
 };
@@ -57,6 +58,7 @@ static char* directory[] =  /* must map with onlp_thermal_id */
 	"15-0048",
 	"15-0049",
 	"15-004a",
+	"15-004c",
 	"15-004b",
 	"9-0059",
 	"9-0058",
@@ -100,9 +102,13 @@ static onlp_thermal_info_t linfo[] = {
 	    ONLP_THERMAL_STATUS_PRESENT,
 	    ES7636BT4_THERMAL_CAPS, 0, {49000, 54000, 59000}
 	},
-	{ { ONLP_THERMAL_ID_CREATE(THERMAL_4_ON_MAIN_BROAD), "LM75-4-4B", 0}, 
+	{ { ONLP_THERMAL_ID_CREATE(THERMAL_4_ON_MAIN_BROAD), "LM75-3-4C", 0},
 	    ONLP_THERMAL_STATUS_PRESENT,
 	    ES7636BT4_THERMAL_CAPS, 0, {42000, 47000, 52000}
+	},
+	{ { ONLP_THERMAL_ID_CREATE(THERMAL_5_ON_MAIN_BROAD), "LM75-4-4B", 0},
+	    ONLP_THERMAL_STATUS_PRESENT,
+	    ES7636BT4_THERMAL_CAPS, 0, {45000, 50000, 55000}
 	},
 	{ { ONLP_THERMAL_ID_CREATE(THERMAL_1_ON_PSU1), 
 	    "PSU-1 Thermal Sensor 1", ONLP_PSU_ID_CREATE(PSU1_ID)}, 
@@ -154,6 +160,7 @@ int onlp_thermali_info_get(onlp_oid_t id, onlp_thermal_info_t* info)
 	case THERMAL_2_ON_MAIN_BROAD:
 	case THERMAL_3_ON_MAIN_BROAD:
 	case THERMAL_4_ON_MAIN_BROAD:
+	case THERMAL_5_ON_MAIN_BROAD:
 		format = THERMAL_PATH_FORMAT;
 		break;
 	case THERMAL_1_ON_PSU1:

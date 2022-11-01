@@ -80,6 +80,7 @@ class OnlPlatform_x86_64_accton_es7636bt4_r0(OnlPlatformAccton,
             ('lm75', 0x48, 15),
             ('lm75', 0x49, 15),
             ('lm75', 0x4a, 15),
+            ('lm75', 0x4c, 15),
             ('lm75', 0x4b, 15),
          ])
 
