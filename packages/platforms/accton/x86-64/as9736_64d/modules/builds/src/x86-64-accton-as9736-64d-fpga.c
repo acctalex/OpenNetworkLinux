@@ -1493,7 +1493,7 @@ static int fpga_i2c_ready_to_read(struct bin_attribute *attr,
 	pdata = attr->private;
 
 	/*Select i2c protocol profile*/
-	iowrite32(0x0, pdata->data_base_addr + pdata->i2c_mgmt_rtc0_profile);
+	iowrite32(0x1, pdata->data_base_addr + pdata->i2c_mgmt_rtc0_profile);
 
 	/*clean read data*/
 	for(cnt = 0 ; cnt < 32; cnt++)
@@ -1550,7 +1550,7 @@ static int fpga_i2c_set_data(struct bin_attribute *attr, loff_t offset, char *da
 	pdata = attr->private;
 
 	/*Select i2c protocol profile*/
-	iowrite32(0x0, pdata->data_base_addr + pdata->i2c_mgmt_rtc0_profile);
+	iowrite32(0x1, pdata->data_base_addr + pdata->i2c_mgmt_rtc0_profile);
 
 	/*clean read data*/
 	for( cnt=0 ; cnt < (PCIE_FPGA_I2C_MAX_LEN/4); cnt++){
