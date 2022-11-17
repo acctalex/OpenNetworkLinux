@@ -327,8 +327,6 @@ enum fpga_set_function_type_t {
 };
 
 enum fpga_sysfs_attributes {
-	MODULE_PRESENT_ALL,
-	MODULE_RXLOS_ALL,
 	/* transceiver attributes */
 	TRANSCEIVER_PRESENT_ATTR_ID(1),
 	TRANSCEIVER_PRESENT_ATTR_ID(2),
@@ -534,6 +532,8 @@ enum fpga_sysfs_attributes {
 	PCIE_FPGA_UDB_VERSION,
 	PCIE_FPGA_LDB_VERSION,
 	PCIE_FPGA_SMB_VERSION,
+	MODULE_PRESENT_ALL,
+	MODULE_RXLOS_ALL,
 };
 
 enum pcie_type_e {
@@ -808,11 +808,6 @@ static struct platform_device pcie_ldb_qsfp_device[] = {
 	&sensor_dev_attr_module_reset_##index.dev_attr.attr, \
 	&sensor_dev_attr_module_lp_mode_##index.dev_attr.attr
 
-static SENSOR_DEVICE_ATTR(module_present_all, S_IRUGO, port_status_read, \
-			  NULL, MODULE_PRESENT_ALL);
-static SENSOR_DEVICE_ATTR(module_rx_los_all, S_IRUGO, port_status_read, NULL, \
-			  MODULE_RXLOS_ALL);
-
 /* transceiver attributes */
 DECLARE_TRANSCEIVER_SENSOR_DEVICE_ATTR(1);
 DECLARE_TRANSCEIVER_SENSOR_DEVICE_ATTR(2);
@@ -890,9 +885,12 @@ static SENSOR_DEVICE_ATTR(udb_version, S_IRUGO, port_status_read, NULL, PCIE_FPG
 static SENSOR_DEVICE_ATTR(ldb_version, S_IRUGO, port_status_read, NULL, PCIE_FPGA_LDB_VERSION);
 static SENSOR_DEVICE_ATTR(smb_version, S_IRUGO, port_status_read, NULL, PCIE_FPGA_SMB_VERSION);
 
+static SENSOR_DEVICE_ATTR(module_present_all, S_IRUGO, port_status_read, \
+			  NULL, MODULE_PRESENT_ALL);
+static SENSOR_DEVICE_ATTR(module_rx_los_all, S_IRUGO, port_status_read, NULL, \
+			  MODULE_RXLOS_ALL);
+
 static struct attribute *fpga_transceiver_attributes[] = {
-	&sensor_dev_attr_module_present_all.dev_attr.attr,
-	&sensor_dev_attr_module_rx_los_all.dev_attr.attr,
 	DECLARE_TRANSCEIVER_ATTR(1),
 	DECLARE_TRANSCEIVER_ATTR(2),
 	DECLARE_TRANSCEIVER_ATTR(3),
@@ -968,6 +966,8 @@ static struct attribute *fpga_transceiver_attributes[] = {
 	&sensor_dev_attr_udb_version.dev_attr.attr,
 	&sensor_dev_attr_ldb_version.dev_attr.attr,
 	&sensor_dev_attr_smb_version.dev_attr.attr,
+	&sensor_dev_attr_module_present_all.dev_attr.attr,
+	&sensor_dev_attr_module_rx_los_all.dev_attr.attr,
 	NULL
 };
 
