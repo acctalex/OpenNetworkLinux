@@ -79,6 +79,7 @@
 #define TRANSCEIVER_TX_DISABLE_ATTR_ID(index) MODULE_TX_DISABLE_##index
 #define TRANSCEIVER_TX_FAULT_ATTR_ID(index)   MODULE_TX_FAULT_##index
 #define TRANSCEIVER_RX_LOS_ATTR_ID(index)     MODULE_RX_LOS_##index
+#define TRANSCEIVER_SFP_SGMII_ATTR_ID(index)  MODULE_SFP_SGMII_##index
 
 /*
  *PCIE port dev define
@@ -228,8 +229,8 @@ struct pcie_fpga_dev_platform_data {
 	.name                   = "pcie_udb_fpga_device",                \
 	.id                     = c,                                     \
 	.dev                    = {                                      \
-		.platform_data 		= &pcie_udb_dev_platform_data[c],\
-		.release 		= device_release,                \
+		.platform_data          = &pcie_udb_dev_platform_data[c],\
+		.release                = device_release,                \
 	},                                                               \
 }
  /*c from 1*/
@@ -239,7 +240,7 @@ struct pcie_fpga_dev_platform_data {
 	.dev_class                  = 1,                                 \
 	.fpga_type = PCIE_FPGA_TYPE_UDB,                                 \
 	.eeprom_bin                 = {                                  \
-		.private = &pcie_udb_eeprom_bin_private_data[c-1],	 \
+		.private = &pcie_udb_eeprom_bin_private_data[c-1],       \
 	},                                                               \
 }
  /*c from 1*/
@@ -261,7 +262,7 @@ struct pcie_fpga_dev_platform_data {
 	.name                   = "pcie_ldb_fpga_device",                \
 	.id                     = c,                                     \
 	.dev                    = {                                      \
-		.platform_data  = &pcie_ldb_dev_platform_data[c],	 \
+		.platform_data  = &pcie_ldb_dev_platform_data[c],        \
 		.release        = device_release,                        \
 	},                                                               \
 }
@@ -283,7 +284,7 @@ struct pcie_fpga_dev_platform_data {
 	.dev_class                  = 1,                                 \
 	.fpga_type = PCIE_FPGA_TYPE_LDB,                                 \
 	.eeprom_bin                 = {                                  \
-		.private = &pcie_ldb_eeprom_bin_private_data[c-1],	 \
+		.private = &pcie_ldb_eeprom_bin_private_data[c-1],       \
 	},                                                               \
 }
 
@@ -294,7 +295,7 @@ struct pcie_fpga_dev_platform_data {
 	.dev_class                  = 2,                                 \
 	.fpga_type = PCIE_FPGA_TYPE_LDB,                                 \
 	.eeprom_bin                 = {                                  \
-		.private = &pcie_ldb_eeprom_bin_private_data[c-1],	 \
+		.private = &pcie_ldb_eeprom_bin_private_data[c-1],       \
 	},                                                               \
 }
 
@@ -529,6 +530,8 @@ enum fpga_sysfs_attributes {
 	TRANSCEIVER_TX_FAULT_ATTR_ID(66),
 	TRANSCEIVER_RX_LOS_ATTR_ID(65),
 	TRANSCEIVER_RX_LOS_ATTR_ID(66),
+	TRANSCEIVER_SFP_SGMII_ATTR_ID(65),
+	TRANSCEIVER_SFP_SGMII_ATTR_ID(66),
 	PCIE_FPGA_UDB_VERSION,
 	PCIE_FPGA_LDB_VERSION,
 	PCIE_FPGA_SMB_VERSION,
@@ -563,9 +566,14 @@ static ssize_t port_status_write(struct device *dev,
 				const char *buf, size_t count);
 
 static ssize_t port_read(struct device *dev, struct device_attribute *da,
-             char *buf);
+	     char *buf);
 static ssize_t port_write(struct device *dev, struct device_attribute *da,
-            const char *buf, size_t count);
+	    const char *buf, size_t count);
+
+static ssize_t sfp_sgmii_read(struct device *dev,
+				struct device_attribute *da, char *buf);
+static ssize_t sfp_sgmii_write(struct device *dev, struct device_attribute *da,
+	    const char *buf, size_t count);
 
 static int fpga_i2c_ready_to_read(struct bin_attribute *attr, int page_type, 
 					int i2c_slave_addr);
@@ -881,6 +889,10 @@ static SENSOR_DEVICE_ATTR(module_tx_fault_65, S_IRUGO, port_status_read, NULL, M
 static SENSOR_DEVICE_ATTR(module_tx_fault_66, S_IRUGO, port_status_read, NULL, MODULE_TX_FAULT_66);
 static SENSOR_DEVICE_ATTR(module_rx_los_65, S_IRUGO, port_status_read, NULL, MODULE_RX_LOS_65);
 static SENSOR_DEVICE_ATTR(module_rx_los_66, S_IRUGO, port_status_read, NULL, MODULE_RX_LOS_66);
+
+static SENSOR_DEVICE_ATTR(module_sfp_sgmii_65, S_IRUGO | S_IWUSR, sfp_sgmii_read, sfp_sgmii_write, MODULE_SFP_SGMII_65);
+static SENSOR_DEVICE_ATTR(module_sfp_sgmii_66, S_IRUGO | S_IWUSR, sfp_sgmii_read, sfp_sgmii_write, MODULE_SFP_SGMII_66);
+
 static SENSOR_DEVICE_ATTR(udb_version, S_IRUGO, port_status_read, NULL, PCIE_FPGA_UDB_VERSION);
 static SENSOR_DEVICE_ATTR(ldb_version, S_IRUGO, port_status_read, NULL, PCIE_FPGA_LDB_VERSION);
 static SENSOR_DEVICE_ATTR(smb_version, S_IRUGO, port_status_read, NULL, PCIE_FPGA_SMB_VERSION);
@@ -963,6 +975,8 @@ static struct attribute *fpga_transceiver_attributes[] = {
 	&sensor_dev_attr_module_tx_fault_66.dev_attr.attr,
 	&sensor_dev_attr_module_rx_los_65.dev_attr.attr,
 	&sensor_dev_attr_module_rx_los_66.dev_attr.attr,
+	&sensor_dev_attr_module_sfp_sgmii_65.dev_attr.attr,
+	&sensor_dev_attr_module_sfp_sgmii_66.dev_attr.attr,
 	&sensor_dev_attr_udb_version.dev_attr.attr,
 	&sensor_dev_attr_ldb_version.dev_attr.attr,
 	&sensor_dev_attr_smb_version.dev_attr.attr,
@@ -1169,11 +1183,13 @@ static int get_present_by_attr_index(int attr_index)
 	case MODULE_TX_DISABLE_65:
 	case MODULE_TX_FAULT_65:
 	case MODULE_RX_LOS_65:
+	case MODULE_SFP_SGMII_65:
 		index_mapping = MODULE_PRESENT_65;
 		break;
 	case MODULE_TX_DISABLE_66:
 	case MODULE_TX_FAULT_66:
 	case MODULE_RX_LOS_66:
+	case MODULE_SFP_SGMII_66:
 		index_mapping = MODULE_PRESENT_66;
 		break;
 	default:
@@ -1185,7 +1201,7 @@ static int get_present_by_attr_index(int attr_index)
 	   (index_mapping <= MODULE_PRESENT_32))
 		present =(
 		(fpga_ctl->pci_fpga_dev[PCI_SUBSYSTEM_ID_UDB].qsfp_present>>
-		(index_mapping - MODULE_PRESENT_1)) & 0x1)?0:1;	
+		(index_mapping - MODULE_PRESENT_1)) & 0x1)?0:1; 
 	else if((index_mapping >= MODULE_PRESENT_33) &&
 		(index_mapping <= MODULE_PRESENT_64))
 		present = (
@@ -1370,8 +1386,344 @@ static ssize_t port_status_read(struct device *dev,
 	return ret;
 }
 
+static ssize_t fpga_read_sgmii_value(u32 port, u32 offset)
+{
+	int  cnt = 0;
+	int  chk_state_cnt = 0;
+	u32  i2c_new_trigger_val = 0;
+	u32  flag = 0;
+	u32  data = 0;
+
+	/*Select i2c protocol profile*/
+	iowrite32(0x1,
+		  fpga_ctl->pci_fpga_dev[PCI_SUBSYSTEM_ID_LDB].data_base_addr +
+		  PCIE_FPGA_I2C_MGMT_RTC0_PROFILE_0 + 0x100*(port-32-1));
+
+	/*clean read data*/
+	for(cnt = 0 ; cnt < 32; cnt++)
+		iowrite32(0x0,
+		  fpga_ctl->pci_fpga_dev[PCI_SUBSYSTEM_ID_LDB].data_base_addr +
+		  (PCIE_FPGA_I2C_RTC_READ_DATA_REG_0 + 0x200*(port-32-1) + 
+		  (4 * cnt)));
+
+	/*clean done status*/
+	iowrite32(0x3,
+		fpga_ctl->pci_fpga_dev[PCI_SUBSYSTEM_ID_LDB].data_base_addr +
+		PCIE_FPGA_I2C_CONTROL_RTC0_STATUS_0 + 0x100*(port-32-1));
+
+	/*set read slave addr*/
+	iowrite32(0x10000002|(0x56 << 8),
+		  fpga_ctl->pci_fpga_dev[PCI_SUBSYSTEM_ID_LDB].data_base_addr +
+		  PCIE_FPGA_I2C_CONTROL_RTC0_CONFIG_0 + 0x100*(port-32-1));
+
+	/*triger*/
+	i2c_new_trigger_val = PCIE_FPGA_I2C_NEW_TRIGGER_VALUE + offset;
+
+	iowrite32(i2c_new_trigger_val,
+		  fpga_ctl->pci_fpga_dev[PCI_SUBSYSTEM_ID_LDB].data_base_addr +
+		  PCIE_FPGA_I2C_CONTROL_RTC0_CONFIG_1 + 0x100*(port-32-1));
+
+	/*read done status*/
+	while( 1 ) {
+		flag = ioread32(
+			fpga_ctl->
+			pci_fpga_dev[PCI_SUBSYSTEM_ID_LDB].data_base_addr +
+			PCIE_FPGA_I2C_CONTROL_RTC0_STATUS_0 +
+			0x100*(port-32-1));
+		if(flag == 0) {
+		/*In normal case:
+		observed chk_state_cnt(10~120) times can get i2c rtc0 done status. */
+			if( chk_state_cnt > 500 ) {
+				flag = -EAGAIN;
+				break;
+			}
+			usleep_range(50, 100);
+			chk_state_cnt++;
+			continue;
+		} else {
+			break;
+		}
+	}
+
+	msleep(1);
+
+	if(flag != 1) {
+		pcie_err("%s ERROR(%d): Port%d pcie get done status failed!!", show_date_time(), flag, port);
+		return -EBUSY;
+	}
+
+	/*read data*/
+	data = ioread32(
+		fpga_ctl->pci_fpga_dev[PCI_SUBSYSTEM_ID_LDB].data_base_addr +
+		PCIE_FPGA_I2C_RTC_READ_DATA_REG_0 + 0x200*(port-32-1));
+
+	return data;
+}
+
+static ssize_t sfp_sgmii_read(struct device *dev,
+				struct device_attribute *da, char *buf)
+{
+	int  present = 0;
+	uint32_t reg_val[4] = {0, 0, 0, 0};
+	uint32_t enable_reg_val[4] = {0x1140, 0x0DE1, 0x0F00, 0x9084};
+	uint32_t tmp = 0;
+	ssize_t  ret = 0;
+	uint32_t offset[4] = {0x00, 0x04, 0x09, 0x1B};
+	uint32_t i = 0;
+	uint32_t is_enabled = 0;
+	struct sensor_device_attribute *attr = to_sensor_dev_attr(da);
+	struct bin_attribute *eeprom = NULL;
+
+	mutex_lock(&update_lock);
+
+	fpga_read_port_status_value(eeprom);
+
+	present = get_present_by_attr_index(attr->index);
+
+	switch(attr->index) {
+	case MODULE_SFP_SGMII_65:
+		if(present) {
+			if(SFP_PORT0_TXDIS(
+			   fpga_ctl->
+			   pci_fpga_dev[PCI_SUBSYSTEM_ID_LDB].sfp_input_data)
+			   & 0x1) {
+				ret = -EIO;
+			}else{
+				for(i = 0; i < 4; i++) {
+					reg_val[i] = fpga_read_sgmii_value(
+						     65, offset[i]);
+
+					tmp = reg_val[i] >> 8;
+					reg_val[i] = (reg_val[i] & 0x00FF) << 8 
+						     | tmp;
+					
+					if(reg_val[i] == enable_reg_val[i])
+						is_enabled++;
+				}
+
+				if(is_enabled == 4 || is_enabled == 0)
+					ret = sprintf(buf, "%d\n", !!is_enabled);
+				else
+					ret = -EBUSY;
+			}
+		} else {
+			ret = -EIO;
+		}
+		break;
+	case MODULE_SFP_SGMII_66:
+		if(present) {
+			if(SFP_PORT1_TXDIS(
+			   fpga_ctl->
+			   pci_fpga_dev[PCI_SUBSYSTEM_ID_LDB].sfp_input_data)
+			   & 0x1) {
+				ret = -EIO;
+			}else{
+				for(i = 0; i < 4; i++) {
+					reg_val[i] = fpga_read_sgmii_value(
+						     66, offset[i]);
+
+					tmp = reg_val[i] >> 8;
+					reg_val[i] = (reg_val[i] & 0x00FF) << 8
+						     | tmp;
+
+					if(reg_val[i] == enable_reg_val[i])
+						is_enabled++;
+				}
+
+				if(is_enabled == 4 || is_enabled == 0)
+					ret = sprintf(buf, "%d\n", !!is_enabled);
+				else
+					ret = -EBUSY;
+			}
+		} else {
+			ret = -EIO;
+		}
+		break;
+	default:
+		ret = -EIO;
+		break;
+	}
+	mutex_unlock(&update_lock);
+
+	return ret;
+}
+
+static ssize_t fpga_write_sgmii_value(u32 port, u32 offset, u32 value)
+{
+	int cnt = 0;
+	int chk_state_cnt = 0;
+	u32  flag = 0;
+	u32  i2c_new_trigger_val = 0;
+
+	/*Select i2c protocol profile*/
+	iowrite32(0x1,
+		  fpga_ctl->pci_fpga_dev[PCI_SUBSYSTEM_ID_LDB].data_base_addr +
+		  PCIE_FPGA_I2C_MGMT_RTC0_PROFILE_0 + 0x100*(port-32-1));
+
+	/*clean write data*/
+	for(cnt=0 ; cnt < 32; cnt++){
+		iowrite32(0x0,
+			fpga_ctl->
+			pci_fpga_dev[PCI_SUBSYSTEM_ID_LDB].data_base_addr +
+			(PCIE_FPGA_I2C_RTC_WRITE_DATA_REG_0 + 0x200*(port-32-1)
+			+ (4 * cnt)));
+	}
+
+	/* Prepare data to set into data registor*/
+	iowrite32(value,
+		  fpga_ctl->pci_fpga_dev[PCI_SUBSYSTEM_ID_LDB].data_base_addr +
+		  PCIE_FPGA_I2C_RTC_WRITE_DATA_REG_0 + 0x200*(port-32-1));
+
+	/*clean done status*/
+	iowrite32(0x3,
+		fpga_ctl->pci_fpga_dev[PCI_SUBSYSTEM_ID_LDB].data_base_addr +
+		PCIE_FPGA_I2C_CONTROL_RTC0_STATUS_0 + 0x100*(port-32-1));
+
+	/*set write slave addr*/
+	iowrite32(0x2 | (0x56 << 8),
+		fpga_ctl->pci_fpga_dev[PCI_SUBSYSTEM_ID_LDB].data_base_addr +
+		PCIE_FPGA_I2C_CONTROL_RTC0_CONFIG_0 + 0x100*(port-32-1));
+
+	/*triger*/
+	i2c_new_trigger_val = PCIE_FPGA_I2C_NEW_TRIGGER_VALUE + offset;
+	iowrite32(i2c_new_trigger_val,
+		fpga_ctl->pci_fpga_dev[PCI_SUBSYSTEM_ID_LDB].data_base_addr +
+		PCIE_FPGA_I2C_CONTROL_RTC0_CONFIG_1 + 0x100*(port-32-1));
+
+	/*read done status*/
+	while(1) {
+		flag = ioread32(
+			fpga_ctl->
+			pci_fpga_dev[PCI_SUBSYSTEM_ID_LDB].data_base_addr +
+			PCIE_FPGA_I2C_CONTROL_RTC0_STATUS_0 +
+			0x100*(port-32-1));
+		if(flag == 0) {
+			/*In normal case:
+			observed chk_state_cnt(10~120) times can get i2c rtc0 done status. */
+			if(chk_state_cnt > 500) {
+				flag = -EAGAIN;
+				break;
+			}
+			usleep_range(50, 100);
+			chk_state_cnt++;
+			continue;
+		} else {
+			break;
+		}
+	}
+	msleep(1);
+
+	if(flag != 1) {
+		pcie_err("%s ERROR(%d): Port%d pcie get done status failed!!", show_date_time(), flag, port);
+		return -EBUSY;
+	}
+
+	return flag;
+}
+
+
+static ssize_t sfp_sgmii_write(struct device *dev, struct device_attribute *da,
+	    const char *buf, size_t count)
+{
+	long value;
+	int present = 0;
+	int status;
+	ssize_t ret = 0;
+	uint32_t i = 0;
+	u32 enable_offset[5] = {0x1B, 0x09, 0x00, 0x04, 0x00};
+	u32 enable_reg_val[5] = {0x8490, 0x000F, 0x4081, 0xE10D, 0x4091};
+	u32 disable_offset[4] = {0x1B, 0x09, 0x04, 0x00};
+	u32 disable_reg_val[4] = {0x8890, 0x000E, 0x010C, 0x4081};
+
+	struct sensor_device_attribute *attr = to_sensor_dev_attr(da);
+	struct bin_attribute *eeprom = NULL;
+
+
+	status = kstrtol(buf, 16, &value);
+	if (status)
+		return status;
+
+	mutex_lock(&update_lock);
+
+	fpga_read_port_status_value(eeprom);
+
+	present = get_present_by_attr_index(attr->index);
+
+	switch(attr->index) {
+	case MODULE_SFP_SGMII_65:
+		if(present) {
+			if(SFP_PORT0_TXDIS(
+			   fpga_ctl->
+			   pci_fpga_dev[PCI_SUBSYSTEM_ID_LDB].sfp_input_data)
+			   & 0x1) {
+				mutex_unlock(&update_lock);
+				return -EIO;
+			}else{
+				if(value == 1) {
+					for(i = 0; i < 5; i++) {
+						fpga_write_sgmii_value(
+							65, enable_offset[i],
+							enable_reg_val[i]);
+					}
+				} else if(value == 0){
+					for(i = 0; i < 4; i++) {
+						fpga_write_sgmii_value(
+							65, disable_offset[i],
+							disable_reg_val[i]);
+					}
+				} else {
+					mutex_unlock(&update_lock);
+					return -EINVAL;
+				}
+			}
+
+		}else{
+			mutex_unlock(&update_lock);
+			return -EIO;
+		}
+		break;
+	case MODULE_SFP_SGMII_66:
+		if(present) {
+			if(SFP_PORT1_TXDIS(
+			   fpga_ctl->pci_fpga_dev[PCI_SUBSYSTEM_ID_LDB].sfp_input_data)
+			   & 0x1) {
+				mutex_unlock(&update_lock);
+				return -EIO;
+			}else{
+				if(value == 1) {
+					for(i = 0; i < 5; i++) {
+						fpga_write_sgmii_value(
+							66, enable_offset[i],
+							enable_reg_val[i]);
+					}
+				} else if(value == 0) {
+					for(i = 0; i < 4; i++) {
+						fpga_write_sgmii_value(
+							66, disable_offset[i],
+							disable_reg_val[i]);
+					}
+				} else {
+					mutex_unlock(&update_lock);
+					return -EINVAL;
+				}
+			}
+		}else{
+			mutex_unlock(&update_lock);
+			return -EIO;
+		}
+		break;
+	default:
+		mutex_unlock(&update_lock);
+		return -EIO;
+	}
+
+	mutex_unlock(&update_lock);
+
+	return count;
+}
+
 static ssize_t port_status_write(struct device *dev, struct device_attribute *da,
-            const char *buf, size_t count)
+	    const char *buf, size_t count)
 {
 	long value;
 	int status;
@@ -1477,6 +1829,8 @@ static ssize_t port_write(struct device *dev, struct device_attribute *da,
 	mutex_unlock(&update_lock);
 	return count;
 }
+
+
 
 /*
  * eeprom read function
@@ -1658,8 +2012,8 @@ static int get_port_present_status(struct bin_attribute *attr)
 
 static ssize_t
 sfp_eeprom_read(struct file *filp, struct kobject *kobj,
-             struct bin_attribute *attr,
-             char *buf, loff_t off, size_t count, int *page)
+	     struct bin_attribute *attr,
+	     char *buf, loff_t off, size_t count, int *page)
 {
 	int state = 0;
 	int page_num, slice;
@@ -1869,8 +2223,8 @@ exit_err:
 }
 
 static ssize_t sfp_bin_write(struct file *filp, struct kobject *kobj,
-                             struct bin_attribute *attr,
-                             char *buf, loff_t off, size_t count)
+			     struct bin_attribute *attr,
+			     char *buf, loff_t off, size_t count)
 {
 	int present;
 	ssize_t status = 0;
@@ -2095,7 +2449,7 @@ static int as9736_64d_pcie_fpga_stat_probe (struct platform_device *pdev)
 			fpga_ctl->pci_fpga_dev[PCI_SUBSYSTEM_ID_SMB].data_mmio_len = pci_resource_len(pcidev, BAR0_NUM);
 
 			pcie_info("(BAR%d resource: Start=0x%lx, Length=%lx)", BAR0_NUM,
-                        	 (unsigned long)fpga_ctl->pci_fpga_dev[PCI_SUBSYSTEM_ID_SMB].data_mmio_start,
+				 (unsigned long)fpga_ctl->pci_fpga_dev[PCI_SUBSYSTEM_ID_SMB].data_mmio_start,
 				 (unsigned long)fpga_ctl->pci_fpga_dev[PCI_SUBSYSTEM_ID_SMB].data_mmio_len);
 			break;
 		default:
@@ -2139,7 +2493,7 @@ static int as9736_64d_pcie_fpga_stat_probe (struct platform_device *pdev)
 			fpga_ctl->pci_fpga_dev[fpga_no].aslpc_cpld2_offset + 0xb0 + cnt);
 		}
 	}
-    
+
 	/* QSFP Port LED: Init present >> LDB/UDB (1 >> 0) */
 	for(fpga_no = PCI_SUBSYSTEM_ID_LDB; 
 	    fpga_no >= PCI_SUBSYSTEM_ID_UDB; fpga_no--){
