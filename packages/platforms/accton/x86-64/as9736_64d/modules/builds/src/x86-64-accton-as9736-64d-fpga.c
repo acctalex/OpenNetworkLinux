@@ -1465,7 +1465,7 @@ static ssize_t sfp_sgmii_read(struct device *dev,
 {
 	int  present = 0;
 	uint32_t reg_val[4] = {0, 0, 0, 0};
-	uint32_t enable_reg_val[4] = {0x1140, 0x0DE1, 0x0F00, 0x9084};
+	uint32_t enable_val = 0x0004;
 	uint32_t tmp = 0;
 	ssize_t  ret = 0;
 	uint32_t offset[4] = {0x00, 0x04, 0x09, 0x1B};
@@ -1489,22 +1489,13 @@ static ssize_t sfp_sgmii_read(struct device *dev,
 			   & 0x1) {
 				ret = -EIO;
 			}else{
-				for(i = 0; i < 4; i++) {
-					reg_val[i] = fpga_read_sgmii_value(
-						     65, offset[i]);
+				reg_val[3] = fpga_read_sgmii_value(
+					     65, offset[3]);
 
-					tmp = reg_val[i] >> 8;
-					reg_val[i] = (reg_val[i] & 0x00FF) << 8 
-						     | tmp;
-					
-					if(reg_val[i] == enable_reg_val[i])
-						is_enabled++;
-				}
+				if(((reg_val[3] >> 8) & 0x000F) == enable_val)
+					is_enabled = 1;
 
-				if(is_enabled == 4 || is_enabled == 0)
-					ret = sprintf(buf, "%d\n", !!is_enabled);
-				else
-					ret = -EBUSY;
+				ret = sprintf(buf, "%d\n", is_enabled);
 			}
 		} else {
 			ret = -EIO;
@@ -1518,22 +1509,13 @@ static ssize_t sfp_sgmii_read(struct device *dev,
 			   & 0x1) {
 				ret = -EIO;
 			}else{
-				for(i = 0; i < 4; i++) {
-					reg_val[i] = fpga_read_sgmii_value(
-						     66, offset[i]);
+				reg_val[3] = fpga_read_sgmii_value(
+					     66, offset[3]);
 
-					tmp = reg_val[i] >> 8;
-					reg_val[i] = (reg_val[i] & 0x00FF) << 8
-						     | tmp;
+				if(((reg_val[3] >> 8) & 0x000F) == enable_val)
+					is_enabled = 1;
 
-					if(reg_val[i] == enable_reg_val[i])
-						is_enabled++;
-				}
-
-				if(is_enabled == 4 || is_enabled == 0)
-					ret = sprintf(buf, "%d\n", !!is_enabled);
-				else
-					ret = -EBUSY;
+				ret = sprintf(buf, "%d\n", is_enabled);
 			}
 		} else {
 			ret = -EIO;
