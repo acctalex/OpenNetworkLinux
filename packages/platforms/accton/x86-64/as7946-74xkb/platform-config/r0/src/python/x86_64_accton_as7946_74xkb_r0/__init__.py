@@ -76,7 +76,7 @@ class OnlPlatform_x86_64_accton_as7946_74xkb_r0(OnlPlatformAccton,
             return False
 
         self.insmod('optoe')
-        for m in [ 'sys' , 'cpld', 'fan', 'psu', 'leds', 'thermal' ]:
+        for m in [ 'sys' , 'cpld', 'fan', 'psu', 'leds', 'thermal', 'fpga' ]:
             self.insmod("x86-64-accton-as7946-74xkb-%s.ko" % m)
 
         ########### initialize I2C bus 0 ###########
@@ -107,6 +107,10 @@ class OnlPlatform_x86_64_accton_as7946_74xkb_r0(OnlPlatformAccton,
                 ('as7946_74xkb_cpld1', 0x61, 12),
                 ('as7946_74xkb_cpld2', 0x62, 13),
                 ('as7946_74xkb_cpld3', 0x63, 16),
+
+                #initiate FPGA
+                ('as7946_74xkb_fpga', 0x60, 11),
+                ('as7946_74xkb_uartip', 0x62, 11),
                 ])
 
         # initialize pca9548 idle_state in kernel 5.4.40 version
