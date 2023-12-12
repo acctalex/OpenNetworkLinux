@@ -9,7 +9,7 @@ class OnlPlatform_x86_64_accton_as7535_28xb_r0(OnlPlatformAccton,
 
     def baseconfig(self):
         self.insmod('optoe')
-        for m in [ 'sys', 'cpld', 'fan', 'psu', 'thermal', 'leds' ]:
+        for m in [ 'sys', 'cpld', 'fan', 'psu', 'thermal', 'leds', 'fpga' ]:
             self.insmod("x86-64-accton-as7535-28xb-%s" % m)
 
         ########### initialize I2C bus 0 ###########
@@ -25,6 +25,10 @@ class OnlPlatform_x86_64_accton_as7535_28xb_r0(OnlPlatformAccton,
 
                 # initialize CPLD
                 ('as7535_28xb_cpld', 0x61, 12),
+
+                #initiate FPGA
+                ('as7535_28xb_fpga', 0x60, 11),
+                ('as7535_28xb_uartip', 0x62, 11),
                 ]
             )
 
