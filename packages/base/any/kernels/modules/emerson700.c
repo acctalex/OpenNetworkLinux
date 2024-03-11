@@ -27,6 +27,8 @@
 #include <linux/i2c.h>
 #include <linux/version.h>
 
+MODULE_LICENSE("GPL");
+
 #if LINUX_VERSION_CODE < KERNEL_VERSION(5,4,0)
 
 
