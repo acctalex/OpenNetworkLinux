@@ -470,6 +470,29 @@ function _show_bmc_device_status {
         _echo "Not support!"
         return
     fi
+    # Get PSU 1
+    psu1_hw_revision=$(eval     "ipmitool raw 0x34 0x16 1 0x14 ${LOG_REDIRECT}")
+    psu1_mfr_id=$(eval           "ipmitool raw 0x34 0x16 1 0x12 ${LOG_REDIRECT}")
+    psu1_data=$(eval            " ipmitool raw 0x34 0x16 1 ${LOG_REDIRECT}")
+
+    _echo "[PSU 1 HW revision ]:"
+    _echo " ${psu1_hw_revision}"
+    _echo "[PSU 1 MFR ID ]:"
+    _echo " ${psu1_mfr_id}"
+    _echo "[PSU 1 data ]:"
+    _echo " ${psu1_data}"
+
+    # Get PSU 2
+    psu2_hw_revision=$(eval     "ipmitool raw 0x34 0x16 2 0x14 ${LOG_REDIRECT}")
+    psu2_mfr_id=$(eval           "ipmitool raw 0x34 0x16 2 0x12 ${LOG_REDIRECT}")
+    psu2_data=$(eval            " ipmitool raw 0x34 0x16 2 ${LOG_REDIRECT}")
+
+    _echo "[PSU 2 HW revision ]:"
+    _echo " ${psu2_hw_revision}"
+    _echo "[PSU 2 MFR ID ]:"
+    _echo " ${psu2_mfr_id}"
+    _echo "[PSU 2 data ]:"
+    _echo " ${psu2_data}"
 }
 
 function _show_cpu_eeprom {
