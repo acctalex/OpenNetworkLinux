@@ -7,15 +7,6 @@ TS_VERSION="0.0.1"
 TRUE=0
 FALSE=1
 
-# Device Serial Number
-SN=$(dmidecode -t 3 | grep "Serial Number" | cut -d : -f 2 | xargs)
-if [ ! $? -eq 0 ]; then
-    SN=""
-elif [[ $SN = *" "* ]]; then
-    #SN contains space charachater inside
-    SN=""
-fi
-
 # DATESTR: The format of log folder and log file
 DATESTR=$(date +"%Y%m%d%H%M%S")
 DEFAULT_LOG_FOLDER_NAME="log_platform_${DATESTR}"
@@ -1254,7 +1245,7 @@ function _getopts {
     local OPTSTRING=":bd:fi:m:v"
     # default log dir
     local log_folder_root=$DEFAULT_LOG_FOLDER_ROOT
-    local identifier=$SN
+    local identifier=""
 
     while getopts ${OPTSTRING} opt; do
         case ${opt} in
