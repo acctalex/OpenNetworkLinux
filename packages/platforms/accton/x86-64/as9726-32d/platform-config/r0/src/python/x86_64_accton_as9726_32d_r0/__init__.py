@@ -1,8 +1,6 @@
 from onl.platform.base import *
 from onl.platform.accton import *
 
-import commands
-
 class OnlPlatform_x86_64_accton_as9726_32d_r0(OnlPlatformAccton,
                                               OnlPlatformPortConfig_32x400_2x10):
 
