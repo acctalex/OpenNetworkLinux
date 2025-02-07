@@ -171,9 +171,12 @@ function _show_system_info {
         _echo "[BMC Date Time ]: ${bmc_date}"
     fi
     _echo "[X86 Up Time   ]: ${x86_uptime}"
-    _echo "[X86 Last Login]: "
-    _echo "${last_login}"
-    _echo ""
+
+    if [[ -f "/var/log/wtmp" ]];then
+        _echo "[X86 Last Login]: "
+        _echo "${last_login}"
+        _echo ""
+    fi
 
     cmd_array=("uname -a" "cat /proc/cmdline" "cat /proc/ioports" \
                "cat /proc/iomem" "cat /proc/meminfo" \
@@ -249,11 +252,15 @@ function _show_board_info {
 function _show_sys_devices {
     _banner "Show System Devices"
 
-    _echo "[Command]: ls /sys/class/gpio/"
-    #ret=($(ls /sys/class/gpio/))
-    #_echo "#${ret[*]}"
-    ret=`ls -al /sys/class/gpio/`
-    _echo "${ret}"
+    local dir_path="/sys/class/gpio/"
+    if [ -d "${dir_path}" ]; then
+        _echo ""
+        _echo "[Command]: ls /sys/class/gpio/"
+        #ret=($(ls /sys/class/gpio/))
+        #_echo "#${ret[*]}"
+        ret=`ls -al /sys/class/gpio/`
+        _echo "${ret}"
+    fi
 
     local file_path="/sys/kernel/debug/gpio"
     if [ -f "${file_path}" ]; then
@@ -483,6 +490,11 @@ function _show_sfp_port_status_sysfs {
     _banner "Show SFP Port Status / EEPROM"
     echo "    Show SFP Port Status / EEPROM, please wait..."
 
+    if [ ${support_sfp} -eq 0 ]; then
+        _echo "Not support!"
+        return
+    fi
+
     j=0
     for (( i=0; i<${#sfp_port_array[@]}; i++ ))
     do
@@ -572,6 +584,11 @@ function _show_sfp_port_status {
 function _show_qsfpdd_port_status_sysfs {
     _banner "Show QSFPDD Port Status / EEPROM"
     echo "    Show QSFPDD Port Status / EEPROM, please wait..."                                                                                    
+
+    if [ ${support_qsfpdd} -eq 0 ]; then
+        _echo "Not support!"
+        return
+    fi
 
     j=0
     for (( i=0; i<${#qsfp_port_array[@]}; i++ ))
@@ -1150,6 +1167,11 @@ function _show_bios_info {
 
 function _show_bios_flash {
     _banner "Show BIOS Flash"
+
+    if [ ${support_bios_flash} -eq 0 ]; then
+        _echo "Not support!"
+        return
+    fi
 
     ret=$(eval "i2cget -f -y ${cpu_cpld_i2c_bus} ${cpu_cpld_i2c_addr} ${bios_flash_reg_offset}")
 

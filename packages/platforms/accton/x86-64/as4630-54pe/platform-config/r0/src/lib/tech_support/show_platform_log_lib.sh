@@ -8,6 +8,7 @@ cpu_eeprom_sysfs="/sys/bus/i2c/devices/${cpu_eeprom_bus_id}-00${cpu_eeprom_i2c_a
 
 
 # BIOS flash
+support_bios_flash=1
 cpu_cpld_i2c_bus="0x1"
 cpu_cpld_i2c_addr="0x65"
 bios_flash_reg_offset="0x11"
@@ -20,6 +21,8 @@ psu1_power_good_sysfs="/sys/bus/i2c/devices/10-0050/psu_power_good"
 psu2_power_good_sysfs="/sys/bus/i2c/devices/11-0051/psu_power_good"
  
 # QSFP/SFP
+support_sfp=1
+support_qsfpdd=1
 sfp_eeprom_bus_array=(0 18 19 20 21)
 qsfp_eeprom_bus_array=(0 22 23)
 

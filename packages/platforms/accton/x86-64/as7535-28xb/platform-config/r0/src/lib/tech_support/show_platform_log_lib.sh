@@ -8,6 +8,7 @@ sys_prefix=/as7535_28xb_sys/
 cpu_eeprom_sysfs="${common_prefix}${sys_prefix}eeprom"      
 
 # BIOS flash
+support_bios_flash=1
 cpu_cpld_i2c_bus="0x1"
 cpu_cpld_i2c_addr="0x65"
 bios_flash_reg_offset="0x11"
@@ -22,6 +23,8 @@ psu1_power_good_sysfs="${common_prefix}${psu_prefix}psu1_power_good"
 psu2_power_good_sysfs="${common_prefix}${psu_prefix}psu2_power_good"
  
 # QSFP/SFP
+support_sfp=1
+support_qsfpdd=1
 sfp_eeprom_bus_array=(0 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48)
 qsfp_eeprom_bus_array=(0 23 21 24 22)
 
