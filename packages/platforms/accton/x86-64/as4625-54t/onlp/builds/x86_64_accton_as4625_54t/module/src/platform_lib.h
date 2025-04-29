@@ -41,6 +41,9 @@
 #define PSU1_ID 1
 #define PSU2_ID 2
 
+#define PSU_STATUS_PRESENT 1
+#define PSU_STATUS_POWER_GOOD 1
+
 #define PSU_NODE_MAX_INT_LEN  8
 #define PSU_NODE_MAX_PATH_LEN 64
 
@@ -61,6 +64,8 @@
 #define IDPROM_PATH "/sys/bus/i2c/devices/7-0051/eeprom"
 
 int psu_pmbus_info_get(int id, char *node, int *value);
+int psu_status_info_get(int id, char *node, int *value);
+int psu_serial_number_get(int id, char *serial, int serial_len);
 
 enum onlp_fan_dir {
 	FAN_DIR_F2B,

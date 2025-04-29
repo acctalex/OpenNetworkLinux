@@ -246,6 +246,8 @@ int
 onlp_thermali_info_get(onlp_oid_t id, onlp_thermal_info_t* info)
 {
 	int tid;
+    int psu_id, psu_tid_start = 0;
+    int val = 0;
 	enum onlp_fan_dir dir;
 
 	VALIDATE(id);
@@ -263,6 +265,18 @@ onlp_thermali_info_get(onlp_oid_t id, onlp_thermal_info_t* info)
 	if (tid == THERMAL_CPU_CORE){
 		return get_max_cpu_coretemp(&info->mcelsius);
 	}
+
+    psu_tid_start = CHASSIS_THERMAL_COUNT + 1;
+
+    if (tid >= psu_tid_start) {
+        psu_id = ( tid <= THERMAL_2_ON_PSU1 ) ? PSU1_ID : PSU2_ID;
+        /* Get power good status */
+        if (psu_status_info_get(psu_id, "psu_power_good", &val) == ONLP_STATUS_OK) {
+            if(val != PSU_STATUS_POWER_GOOD) {
+                info->status |= ONLP_THERMAL_STATUS_FAILED;
+            }
+        }
+    }
 
 	return onlp_file_read_int(&info->mcelsius, devfiles__[tid]);
 }

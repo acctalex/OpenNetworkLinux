@@ -27,24 +27,12 @@
 #include <string.h>
 #include "platform_lib.h"
 
-#define PSU_STATUS_PRESENT 1
-#define PSU_STATUS_POWER_GOOD 1
-
 #define VALIDATE(_id)                           \
 	do {                                        \
 		if(!ONLP_OID_IS_PSU(_id)) {             \
 			return ONLP_STATUS_E_INVALID;       \
 		}                                       \
 	} while(0)
-
-static int
-psu_status_info_get(int id, char *node, int *value)
-{
-	char *path[] = { PSU1_AC_EEPROM_PREFIX, PSU2_AC_EEPROM_PREFIX };
-	*value = 0;
-
-	return onlp_file_read_int(value, "%s%s", path[id-1], node);
-}
 
 int
 onlp_psui_init(void)
@@ -94,8 +82,7 @@ psu_ym2651y_info_get(onlp_psu_info_t* info)
 		info->caps |= ONLP_PSU_CAPS_POUT;
 	}
 
-	get_psu_eeprom_str(index, info->serial, sizeof(info->serial), 
-				"psu_serial_number");
+    psu_serial_number_get(index, info->serial, sizeof(info->serial));
 
 	return ONLP_STATUS_OK;
 }
@@ -151,12 +138,6 @@ onlp_psui_info_get(onlp_oid_t id, onlp_psu_info_t* info)
 	/* Get PSU type */
 	psu_type = get_psu_type(index, info->model, sizeof(info->model));
 
-	if ((val != PSU_STATUS_POWER_GOOD) && (psu_type == PSU_TYPE_UNKNOWN)) {
-		info->status |=  ONLP_PSU_STATUS_UNPLUGGED;
-	} else if((val != PSU_STATUS_POWER_GOOD) && (psu_type != PSU_TYPE_UNKNOWN)){
-		info->status |=  ONLP_PSU_STATUS_FAILED;
-	}
-
 	switch (psu_type) {
 		case PSU_TYPE_UP1K21R_1085G_F2B:
 		case PSU_TYPE_UPD1501SA_1179G_F2B:
@@ -164,6 +145,11 @@ onlp_psui_info_get(onlp_oid_t id, onlp_psu_info_t* info)
 			ret = psu_ym2651y_info_get(info);
 			break;
 		case PSU_TYPE_UNKNOWN:  /* User insert a unknown PSU or unplugged.*/
+            /* Set the associated oid_table */
+            info->hdr.coids[0] = ONLP_FAN_ID_CREATE(index + CHASSIS_FAN_COUNT);
+            info->hdr.coids[1] = ONLP_THERMAL_ID_CREATE((index-1) * NUM_OF_THERMAL_PER_PSU + CHASSIS_THERMAL_COUNT + 1);
+            info->hdr.coids[2] = ONLP_THERMAL_ID_CREATE((index-1) * NUM_OF_THERMAL_PER_PSU + CHASSIS_THERMAL_COUNT + 2);
+
 			info->status |= ONLP_PSU_STATUS_UNPLUGGED;
 			info->status &= ~ONLP_PSU_STATUS_FAILED;
 			ret = ONLP_STATUS_OK;
@@ -172,6 +158,11 @@ onlp_psui_info_get(onlp_oid_t id, onlp_psu_info_t* info)
 			ret = ONLP_STATUS_E_UNSUPPORTED;
 			break;
 	}
+
+    if (val != PSU_STATUS_POWER_GOOD) {
+        info->status |=  ONLP_PSU_STATUS_UNPLUGGED;
+        info->caps = 0;
+    }
 
 	return ret;
 }

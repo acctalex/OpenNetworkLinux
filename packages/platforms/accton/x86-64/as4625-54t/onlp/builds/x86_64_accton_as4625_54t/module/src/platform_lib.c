@@ -12,12 +12,12 @@
 psu_type_t get_psu_type(int id, char *data_buf, int data_len)
 {
 	int len = 0;
-	char *path[] = { PSU1_AC_EEPROM_PREFIX, PSU2_AC_EEPROM_PREFIX };
+	char *path[] = { PSU1_AC_PMBUS_PREFIX, PSU2_AC_PMBUS_PREFIX };
 	char *str = NULL;
 	psu_type_t ptype = PSU_TYPE_UNKNOWN;
 
 	/* Read attribute */
-	len = onlp_file_read_str(&str, "%s%s", path[id-1], "psu_model_name");
+	len = onlp_file_read_str(&str, "%s%s", path[id-1], "psu_mfr_model");
 	if (!str || len <= 0 || len < PSU_MODEL_NAME_LEN) {
 		AIM_FREE_IF_PTR(str);
 		return PSU_TYPE_UNKNOWN;
@@ -46,6 +46,14 @@ int psu_pmbus_info_get(int id, char *node, int *value)
 	*value = 0;
 
 	return onlp_file_read_int(value, "%s%s", path[id-1], node);
+}
+
+int psu_status_info_get(int id, char *node, int *value)
+{
+    char *path[] = { PSU1_AC_EEPROM_PREFIX, PSU2_AC_EEPROM_PREFIX };
+    *value = 0;
+
+    return onlp_file_read_int(value, "%s%s", path[id-1], node);
 }
 
 int get_psu_eeprom_str(int id, char *data_buf, int data_len, char *data_name)
@@ -82,4 +90,27 @@ enum onlp_fan_dir onlp_get_fan_dir(void)
 	dir = (value == 2) ? FAN_DIR_B2F : FAN_DIR_F2B;
 
 	return dir;
+}
+
+#define PSU_SERIAL_NUMBER_LEN  10
+
+int psu_serial_number_get(int id, char *serial, int serial_len)
+{
+    int   size = 0;
+    int   ret  = ONLP_STATUS_OK;
+    char *path[] = { PSU1_AC_PMBUS_PREFIX, PSU2_AC_PMBUS_PREFIX };
+
+    if (serial == NULL || serial_len < PSU_SERIAL_NUMBER_LEN)
+            return ONLP_STATUS_E_PARAM;
+
+    ret = onlp_file_read((uint8_t*)serial, PSU_SERIAL_NUMBER_LEN, &size,
+                         "%s%s", path[id-1], "psu_mfr_serial");
+
+    if (ret != ONLP_STATUS_OK || size > PSU_SERIAL_NUMBER_LEN) {
+        serial[0] = '\0'; /* SN = NULL */
+        return ONLP_STATUS_E_INTERNAL;
+    }
+
+    serial[PSU_SERIAL_NUMBER_LEN -1] = '\0';
+    return ONLP_STATUS_OK;
 }
