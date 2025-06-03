@@ -58,6 +58,21 @@
 
 #define IDPROM_PATH "/sys/bus/i2c/devices/13-0056/eeprom"
 
+enum onlp_thermal_id
+{
+        THERMAL_RESERVED = 0,
+        THERMAL_CPU_CORE,
+        THERMAL_1_ON_MAIN_BROAD,
+        THERMAL_2_ON_MAIN_BROAD,
+        THERMAL_3_ON_MAIN_BROAD,
+        THERMAL_4_ON_MAIN_BROAD,
+        THERMAL_5_ON_MAIN_BROAD,
+        THERMAL_6_ON_MAIN_BROAD,
+        THERMAL_1_ON_PSU1,
+        THERMAL_1_ON_PSU2,
+        THERMAL_COUNT,
+};
+
 int psu_pmbus_info_get(int id, char *node, int *value);
 int psu_ym2651y_pmbus_info_set(int id, char *node, int value);
 
