@@ -166,10 +166,10 @@ psu_type_t get_psu_type(int id, char* modelname, int modelname_len)
         return PSU_TYPE_SPAACTN_03;
     }
 
-    if (!strncmp(str, "CRXT_T0T12", strlen("CRXT_T0T12")))
+    if (!strncmp(str, "CRXT-T0T12", strlen("CRXT-T0T12")))
     {
         if (modelname)
-            aim_strlcpy(modelname, str, strlen("CRXT_T0T12")<(modelname_len-1)?(strlen("CRXT_T0T12")+1):(modelname_len-1));
+            aim_strlcpy(modelname, str, strlen("CRXT-T0T12")<(modelname_len-1)?(strlen("CRXT-T0T12")+1):(modelname_len-1));
             AIM_FREE_IF_PTR(str);
         return PSU_TYPE_CRXT_T0T12;
     }
