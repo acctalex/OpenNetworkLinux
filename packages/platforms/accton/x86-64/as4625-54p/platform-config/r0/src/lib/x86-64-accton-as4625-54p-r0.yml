@@ -27,4 +27,4 @@ x86-64-accton-as4625-54p-r0:
   network:
     interfaces:
       ma1:
-        name: eth2
+        name: eth0
