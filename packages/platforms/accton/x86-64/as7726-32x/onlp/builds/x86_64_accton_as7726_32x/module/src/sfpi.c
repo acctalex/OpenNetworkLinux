@@ -295,7 +295,6 @@ onlp_sfpi_control_set(int port, onlp_sfp_control_t control, int value)
             {
                 if(port >= 0 && port <= 31) {
                     present = onlp_sfpi_is_present(port);
-                    /* read qsfp eeprom offset of tx disable if qsfp on the port */
                     if(present == 1){
                         /* txdis valid bit(bit0-bit3), xxxx 1111 */
                         value = value&0xf;
@@ -379,7 +378,6 @@ onlp_sfpi_control_get(int port, onlp_sfp_control_t control, int* value)
             {
                 if(port >= 0 && port <= 31) {
                     present = onlp_sfpi_is_present(port);
-                    /* read qsfp eeprom offset of tx disable if qsfp on the port */
                     if(present == 1)
                     {
                         tx_dis = onlp_sfpi_dev_readb(port, PORT_EEPROM_DEVADDR, QSFP_EEPROM_OFFSET_TXDIS);
