@@ -42,8 +42,8 @@
 #define PSU_STATUS_PRESENT 1
 #define PSU_STATUS_POWER_GOOD 1
 
-#define PSU_SYSFS_FORMAT   "/sys/devices/platform/as9817_32_psu.%d*psu%d_%s"
-#define PSU_SYSFS_FORMAT_1 "/sys/devices/platform/as9817_32_psu.%d/hwmon/hwmon%d/%s"
+#define PSU_SYSFS_FORMAT   "/sys/devices/platform/as9817_32_psu*psu%d_%s"
+#define PSU_SYSFS_FORMAT_1 "/sys/devices/platform/as9817_32_psu/hwmon/hwmon%d/%s"
 #define FAN_SYSFS_FORMAT   "/sys/devices/platform/as9817_32_fan*"
 #define FAN_SYSFS_FORMAT_1 "/sys/devices/platform/as9817_32_fan/hwmon/hwmon%d/%s"
 #define SYS_LED_PATH   "/sys/devices/platform/as9817_32_led/"

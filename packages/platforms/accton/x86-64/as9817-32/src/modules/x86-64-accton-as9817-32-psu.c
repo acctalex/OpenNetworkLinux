@@ -153,7 +153,7 @@ struct ipmi_psu_resp_data {
 };
 
 struct as9817_32_psu_data {
-    struct platform_device *pdev[2];
+    struct platform_device *pdev;
     struct device   *hwmon_dev[2];
     struct mutex update_lock;
     char valid[2]; /* != 0 if registers are valid, 0: PSU1, 1: PSU2 */
@@ -811,31 +811,37 @@ static int as9817_32_psu_probe(struct platform_device *pdev)
 {
     int status = 0;
     struct device *hwmon_dev = NULL;
+    int i = 0;
 
-    hwmon_dev = hwmon_device_register_with_info(&pdev->dev, DRVNAME, 
-                    NULL, NULL, as9817_32_psu_groups[pdev->id]);
-    if (IS_ERR(hwmon_dev)) {
-        status = PTR_ERR(hwmon_dev);
-        return status;
+    for (i = 0 ; i < 2 ; i++){
+        hwmon_dev = hwmon_device_register_with_info(&pdev->dev, DRVNAME, 
+                        NULL, NULL, as9817_32_psu_groups[i]);
+        if (IS_ERR(hwmon_dev)) {
+            status = PTR_ERR(hwmon_dev);
+            return status;
+        }
+        mutex_lock(&data->update_lock);
+        data->hwmon_dev[i] = hwmon_dev;
+        mutex_unlock(&data->update_lock);
+
+        dev_info(&pdev->dev, "PSU%d device created\n", i+1);
     }
-
-    mutex_lock(&data->update_lock);
-    data->hwmon_dev[pdev->id] = hwmon_dev;
-    mutex_unlock(&data->update_lock);
-
-    dev_info(&pdev->dev, "PSU%d device created\n", pdev->id + 1);
 
     return 0;
 }
 
 static int as9817_32_psu_remove(struct platform_device *pdev)
 {
-    mutex_lock(&data->update_lock);
-    if (data->hwmon_dev[pdev->id]) {
-        hwmon_device_unregister(data->hwmon_dev[pdev->id]);
-        data->hwmon_dev[pdev->id] = NULL;
+    int i = 0;
+
+    for (i = 0 ; i < 2 ; i++){
+        mutex_lock(&data->update_lock);
+        if (data->hwmon_dev[i]) {
+            hwmon_device_unregister(data->hwmon_dev[i]);
+            data->hwmon_dev[i] = NULL;
+        }
+        mutex_unlock(&data->update_lock);
     }
-    mutex_unlock(&data->update_lock);
 
     return 0;
 }
@@ -843,7 +849,6 @@ static int as9817_32_psu_remove(struct platform_device *pdev)
 static int __init as9817_32_psu_init(void)
 {
     int ret;
-    int i;
 
     data = kzalloc(sizeof(struct as9817_32_psu_data), GFP_KERNEL);
     if (!data) {
@@ -857,26 +862,21 @@ static int __init as9817_32_psu_init(void)
     if (ret < 0)
         goto dri_reg_err;
 
-    for (i = 0; i < NUM_OF_PSU; i++) {
-        data->pdev[i] = platform_device_register_simple(DRVNAME, i, NULL, 0);
-        if (IS_ERR(data->pdev[i])) {
-            ret = PTR_ERR(data->pdev[i]);
-            goto dev_reg_err;
-        }
-
-        /* Set up IPMI interface */
-        ret = init_ipmi_data(&data->ipmi, 0, &data->pdev[i]->dev);
-        if (ret)
-            goto ipmi_err;
+    data->pdev = platform_device_register_simple(DRVNAME, -1, NULL, 0);
+    if (IS_ERR(data->pdev)) {
+        ret = PTR_ERR(data->pdev);
+        goto dev_reg_err;
     }
+
+    /* Set up IPMI interface */
+    ret = init_ipmi_data(&data->ipmi, 0, &data->pdev->dev);
+    if (ret)
+        goto ipmi_err;
 
     return 0;
 
 ipmi_err:
-    while (i > 0) {
-        i--;
-        platform_device_unregister(data->pdev[i]);
-    }
+    platform_device_unregister(data->pdev);
 dev_reg_err:
     platform_driver_unregister(&as9817_32_psu_driver);
 dri_reg_err:
@@ -887,12 +887,8 @@ alloc_err:
 
 static void __exit as9817_32_psu_exit(void)
 {
-    int i;
-
     ipmi_destroy_user(data->ipmi.user);
-    for (i = 0; i < NUM_OF_PSU; i++) {
-        platform_device_unregister(data->pdev[i]);
-    }
+    platform_device_unregister(data->pdev);
     platform_driver_unregister(&as9817_32_psu_driver);
     kfree(data);
 }

@@ -71,9 +71,15 @@ int onlp_get_psu_hwmon_idx(int pid)
     int ret, hwmon_idx, max_hwmon_idx = 20;
 
     for (hwmon_idx = 0; hwmon_idx <= max_hwmon_idx; hwmon_idx++) {
-        snprintf(path, sizeof(path), "/sys/devices/platform/as9817_32_psu.%d/hwmon/hwmon%d/", pid-1, hwmon_idx);
+        snprintf(path, sizeof(path), "/sys/devices/platform/as9817_32_psu/hwmon/hwmon%d/", hwmon_idx);
 
-        ret = onlp_file_find(path, "name", &file);
+        if (pid == 1)
+            ret = onlp_file_find(path, "psu1_present", &file);
+        else if (pid == 2)
+            ret = onlp_file_find(path, "psu2_present", &file);
+        else
+            return -1;
+
         AIM_FREE_IF_PTR(file);
 
         if (ONLP_STATUS_OK == ret)
@@ -89,7 +95,7 @@ int onlp_get_psu_power_good(int pid)
     int val = 0;
 
     /* Get power good status */
-    ret = onlp_file_read_int(&val, PSU_SYSFS_FORMAT, (pid-1), pid, "power_good");
+    ret = onlp_file_read_int(&val, PSU_SYSFS_FORMAT, pid, "power_good");
     if (ret < 0) {
         return ONLP_STATUS_E_INTERNAL;
     }
