@@ -60,6 +60,7 @@
 
 /* QSFP DD Specific*/
 #define QSFP_DD_IDENTIFIER 0x18
+#define QSFP_DD_PAGE_ADMIN_INFO 0x0
 #define QSFP_DD_PAGE_ADVERTISING 0x1
 #define QSFP_DD_PAGE_LANE_CTRL 0x10
 #define QSFP_DD_P01H_OFFSET_CONTROL_1 0x9B
@@ -353,7 +354,6 @@ int onlp_sfpi_control_set(int port, onlp_sfp_control_t control, int value)
 
 						onlp_sfpi_dev_writeb(port, PORT_EEPROM_DEVADDR, QSFP_EEPROM_OFFSET_BANK_SELECT, 0);
 						onlp_sfpi_dev_writeb(port, PORT_EEPROM_DEVADDR, QSFP_EEPROM_OFFSET_PAGE_SELECT, QSFP_DD_PAGE_LANE_CTRL);
-
 						onlp_sfpi_dev_writeb(port, PORT_EEPROM_DEVADDR, QSFP_DD_P10H_OFFSET_OUTPUT_DISABLE_TX, value);
 
 						rv = ONLP_STATUS_OK;
@@ -361,6 +361,7 @@ int onlp_sfpi_control_set(int port, onlp_sfp_control_t control, int value)
 						AIM_LOG_ERROR("Setting tx disable to port(%d) is not supported\r\n", port);
 						rv = ONLP_STATUS_E_UNSUPPORTED;
 					}
+					onlp_sfpi_dev_writeb(port, PORT_EEPROM_DEVADDR, QSFP_EEPROM_OFFSET_PAGE_SELECT, QSFP_DD_PAGE_ADMIN_INFO);
 				} else { /* QSFP */
 					/* txdis valid bit(bit0-bit3), xxxx 1111 */
 					value = value&0xf;
@@ -490,6 +491,8 @@ int onlp_sfpi_control_get(int port, onlp_sfp_control_t control, int* value)
 					onlp_sfpi_dev_writeb(port, PORT_EEPROM_DEVADDR, QSFP_EEPROM_OFFSET_BANK_SELECT, 0);
 					onlp_sfpi_dev_writeb(port, PORT_EEPROM_DEVADDR, QSFP_EEPROM_OFFSET_PAGE_SELECT, QSFP_DD_PAGE_LANE_CTRL);
 					tx_dis = onlp_sfpi_dev_readb(port, PORT_EEPROM_DEVADDR, QSFP_DD_P10H_OFFSET_OUTPUT_DISABLE_TX);
+					
+					onlp_sfpi_dev_writeb(port, PORT_EEPROM_DEVADDR, QSFP_EEPROM_OFFSET_PAGE_SELECT, QSFP_DD_PAGE_ADMIN_INFO);
 				} else { /* QSFP */
 					tx_dis = onlp_sfpi_dev_readb(port, PORT_EEPROM_DEVADDR, QSFP_EEPROM_OFFSET_TXDIS);
 				}
