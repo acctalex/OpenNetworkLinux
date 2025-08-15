@@ -45,12 +45,12 @@ static char* devfiles__[] = { /* must map with onlp_thermal_id */
     "/sys/devices/platform/as9817_64_thermal*temp6_input",
     "/sys/devices/platform/as9817_64_thermal*temp7_input",
     "/sys/devices/platform/as9817_64_thermal*temp8_input",
-    "/sys/devices/platform/as9817_64_psu.0*psu1_temp1_input",
-    "/sys/devices/platform/as9817_64_psu.0*psu1_temp2_input",
-    "/sys/devices/platform/as9817_64_psu.0*psu1_temp3_input",
-    "/sys/devices/platform/as9817_64_psu.1*psu2_temp1_input",
-    "/sys/devices/platform/as9817_64_psu.1*psu2_temp2_input",
-    "/sys/devices/platform/as9817_64_psu.1*psu2_temp3_input"
+    "/sys/devices/platform/as9817_64_psu*psu1_temp1_input",
+    "/sys/devices/platform/as9817_64_psu*psu1_temp2_input",
+    "/sys/devices/platform/as9817_64_psu*psu1_temp3_input",
+    "/sys/devices/platform/as9817_64_psu*psu2_temp1_input",
+    "/sys/devices/platform/as9817_64_psu*psu2_temp2_input",
+    "/sys/devices/platform/as9817_64_psu*psu2_temp3_input"
 };
 
 static char* cpu_coretemp_files[] = {
