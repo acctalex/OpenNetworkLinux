@@ -27,23 +27,19 @@
 #include <linux/sysfs.h>
 #include <linux/hwmon.h>
 #include <linux/hwmon-sysfs.h>
-#include <linux/ipmi.h>
-#include <linux/ipmi_smi.h>
 #include <linux/platform_device.h>
+#include "accton_ipmi_intf.h"
+
 
 #define DRVNAME "as9947_36xkb_psu"
-#define ACCTON_IPMI_NETFN 0x34
 #define IPMI_PSU_READ_CMD 0x16
 #define IPMI_PSU_MODEL_NAME_CMD 0x10
 #define IPMI_PSU_SERIAL_NUM_CMD 0x11
 #define IPMI_PSU_FAN_DIR_CMD 0x13
 #define IPMI_PSU_INFO_CMD 0x20
-#define IPMI_TIMEOUT (5 * HZ)
-#define IPMI_ERR_RETRY_TIMES 1
 #define IPMI_MODEL_SERIAL_LEN 32
 #define IPMI_FAN_DIR_LEN 3
 
-static void ipmi_msg_handler(struct ipmi_recv_msg *msg, void *user_msg_data);
 static ssize_t show_psu(struct device *dev, struct device_attribute *attr,
                             char *buf);
 static ssize_t show_psu_info(struct device *dev, struct device_attribute *attr,
@@ -146,23 +142,6 @@ enum psu_data_index {
     PSU_INFO_COUNT
 };
 
-struct ipmi_data {
-    struct completion read_complete;
-    struct ipmi_addr address;
-    struct ipmi_user * user;
-    int interface;
-
-    struct kernel_ipmi_msg tx_message;
-    long tx_msgid;
-
-    void *rx_msg_data;
-    unsigned short rx_msg_len;
-    unsigned char rx_result;
-    int rx_recv_type;
-
-    struct ipmi_user_hndl ipmi_hndlrs;
-};
-
 struct ipmi_psu_resp_data {
     unsigned char status[PSU_STATUS_COUNT];
     unsigned char info[PSU_INFO_COUNT];
@@ -172,7 +151,7 @@ struct ipmi_psu_resp_data {
 };
 
 struct as9947_36xkb_psu_data {
-    struct platform_device *pdev[2];
+    struct platform_device *pdev;
     struct device   *hwmon_dev[2];
     struct mutex update_lock;
     char valid[2]; /* != 0 if registers are valid, 0: PSU1, 1: PSU2 */
@@ -414,139 +393,6 @@ const struct attribute_group *as9947_36xkb_psu_groups[][2] = {
     {&as9947_36xkb_psu1_group, NULL},
     {&as9947_36xkb_psu2_group, NULL}
 };
-
-/* Functions to talk to the IPMI layer */
-
-/* Initialize IPMI address, message buffers and user data */
-static int init_ipmi_data(struct ipmi_data *ipmi, int iface)
-{
-    int err;
-
-    init_completion(&ipmi->read_complete);
-
-    /* Initialize IPMI address */
-    ipmi->address.addr_type = IPMI_SYSTEM_INTERFACE_ADDR_TYPE;
-    ipmi->address.channel = IPMI_BMC_CHANNEL;
-    ipmi->address.data[0] = 0;
-    ipmi->interface = iface;
-
-    /* Initialize message buffers */
-    ipmi->tx_msgid = 0;
-    ipmi->tx_message.netfn = ACCTON_IPMI_NETFN;
-
-    ipmi->ipmi_hndlrs.ipmi_recv_hndl = ipmi_msg_handler;
-
-    /* Create IPMI messaging interface user */
-    err = ipmi_create_user(ipmi->interface, &ipmi->ipmi_hndlrs,
-                   ipmi, &ipmi->user);
-    if (err < 0) {
-        pr_err("Unable to register user with IPMI "
-            "interface %d\n", ipmi->interface);
-        return -EACCES;
-    }
-
-    return 0;
-}
-
-/* Send an IPMI command */
-static int _ipmi_send_message(struct ipmi_data *ipmi, unsigned char cmd,
-                                unsigned char *tx_data, unsigned short tx_len,
-                                unsigned char *rx_data, unsigned short rx_len)
-{
-    int err;
-
-    ipmi->tx_message.cmd = cmd;
-    ipmi->tx_message.data = tx_data;
-    ipmi->tx_message.data_len = tx_len;
-    ipmi->rx_msg_data = rx_data;
-    ipmi->rx_msg_len = rx_len;
-
-    err = ipmi_validate_addr(&ipmi->address, sizeof(ipmi->address));
-    if (err)
-        goto addr_err;
-
-    ipmi->tx_msgid++;
-    err = ipmi_request_settime(ipmi->user, &ipmi->address, ipmi->tx_msgid,
-                   &ipmi->tx_message, ipmi, 0, 0, 0);
-    if (err)
-        goto ipmi_req_err;
-
-    err = wait_for_completion_timeout(&ipmi->read_complete, IPMI_TIMEOUT);
-    if (!err)
-        goto ipmi_timeout_err;
-
-    return 0;
-
-ipmi_timeout_err:
-    err = -ETIMEDOUT;
-    pr_err("request_timeout=%x\n", err);
-    return err;
-ipmi_req_err:
-    pr_err("request_settime=%x\n", err);
-    return err;
-addr_err:
-    pr_err("validate_addr=%x\n", err);
-    return err;
-}
-
-/* Send an IPMI command with retry */
-static int ipmi_send_message(struct ipmi_data *ipmi, unsigned char cmd,
-                                unsigned char *tx_data, unsigned short tx_len,
-                                unsigned char *rx_data, unsigned short rx_len)
-{
-    int status = 0, retry = 0;
-
-    for (retry = 0; retry <= IPMI_ERR_RETRY_TIMES; retry++) {
-        status = _ipmi_send_message(ipmi, cmd, tx_data, tx_len, rx_data, rx_len);
-        if (unlikely(status != 0)) {
-            pr_err("ipmi_send_message_%d err status(%d)\r\n", retry, status);
-            continue;
-        }
-
-        if (unlikely(ipmi->rx_result != 0)) {
-            pr_err("ipmi_send_message_%d err result(%d)\r\n", retry, ipmi->rx_result);
-            continue;
-        }
-
-        break;
-    }
-
-    return status;
-}
-
-/* Dispatch IPMI messages to callers */
-static void ipmi_msg_handler(struct ipmi_recv_msg *msg, void *user_msg_data)
-{
-    unsigned short rx_len;
-    struct ipmi_data *ipmi = user_msg_data;
-
-    if (msg->msgid != ipmi->tx_msgid) {
-        pr_err("Mismatch between received msgid "
-            "(%02x) and transmitted msgid (%02x)!\n",
-            (int)msg->msgid,
-            (int)ipmi->tx_msgid);
-        ipmi_free_recv_msg(msg);
-        return;
-    }
-
-    ipmi->rx_recv_type = msg->recv_type;
-    if (msg->msg.data_len > 0)
-        ipmi->rx_result = msg->msg.data[0];
-    else
-        ipmi->rx_result = IPMI_UNKNOWN_ERR_COMPLETION_CODE;
-
-    if (msg->msg.data_len > 1) {
-        rx_len = msg->msg.data_len - 1;
-        if (ipmi->rx_msg_len < rx_len)
-            rx_len = ipmi->rx_msg_len;
-        ipmi->rx_msg_len = rx_len;
-        memcpy(ipmi->rx_msg_data, msg->msg.data + 1, ipmi->rx_msg_len);
-    } else
-        ipmi->rx_msg_len = 0;
-
-    ipmi_free_recv_msg(msg);
-    complete(&ipmi->read_complete);
-}
 
 static struct as9947_36xkb_psu_data *as9947_36xkb_psu_update_device(struct device_attribute *da)
 {
@@ -963,31 +809,38 @@ static int as9947_36xkb_psu_probe(struct platform_device *pdev)
 {
     int status = 0;
     struct device *hwmon_dev = NULL;
+    int i = 0;
 
-    hwmon_dev = hwmon_device_register_with_info(&pdev->dev, DRVNAME, 
-                    NULL, NULL, as9947_36xkb_psu_groups[pdev->id]);
-    if (IS_ERR(hwmon_dev)) {
-        status = PTR_ERR(hwmon_dev);
-        return status;
+    for (i = 0; i < 2 ; i++) {
+        hwmon_dev = hwmon_device_register_with_info(&pdev->dev, DRVNAME, 
+                        NULL, NULL, as9947_36xkb_psu_groups[i]);
+        if (IS_ERR(hwmon_dev)) {
+            status = PTR_ERR(hwmon_dev);
+            return status;
+        }
+
+        mutex_lock(&data->update_lock);
+        data->hwmon_dev[i] = hwmon_dev;
+        mutex_unlock(&data->update_lock);
+
+        dev_info(&pdev->dev, "PSU%d device created\n", i + 1);
     }
-
-    mutex_lock(&data->update_lock);
-    data->hwmon_dev[pdev->id] = hwmon_dev;
-    mutex_unlock(&data->update_lock);
-
-    dev_info(&pdev->dev, "PSU%d device created\n", pdev->id + 1);
 
     return 0;
 }
 
 static int as9947_36xkb_psu_remove(struct platform_device *pdev)
 {
-    mutex_lock(&data->update_lock);
-    if (data->hwmon_dev[pdev->id]) {
-        hwmon_device_unregister(data->hwmon_dev[pdev->id]);
-        data->hwmon_dev[pdev->id] = NULL;
+    int i = 0;
+
+    for(i = 0; i < 2 ; i++) {
+        mutex_lock(&data->update_lock);
+        if (data->hwmon_dev[i]) {
+            hwmon_device_unregister(data->hwmon_dev[i]);
+            data->hwmon_dev[i] = NULL;
+        }
+        mutex_unlock(&data->update_lock);
     }
-    mutex_unlock(&data->update_lock);
 
     return 0;
 }
@@ -995,7 +848,6 @@ static int as9947_36xkb_psu_remove(struct platform_device *pdev)
 static int __init as9947_36xkb_psu_init(void)
 {
     int ret;
-    int i;
 
     data = kzalloc(sizeof(struct as9947_36xkb_psu_data), GFP_KERNEL);
     if (!data) {
@@ -1009,16 +861,15 @@ static int __init as9947_36xkb_psu_init(void)
     if (ret < 0)
         goto dri_reg_err;
 
-    for (i = 0; i < NUM_OF_PSU; i++) {
-        data->pdev[i] = platform_device_register_simple(DRVNAME, i, NULL, 0);
-        if (IS_ERR(data->pdev[i])) {
-            ret = PTR_ERR(data->pdev[i]);
-            goto dev_reg_err;
-        }
+
+    data->pdev = platform_device_register_simple(DRVNAME, -1, NULL, 0);
+    if (IS_ERR(data->pdev)) {
+        ret = PTR_ERR(data->pdev);
+        goto dev_reg_err;
     }
 
     /* Set up IPMI interface */
-    ret = init_ipmi_data(&data->ipmi, 0);
+    ret = init_ipmi_data(&data->ipmi, 0, &data->pdev->dev);
     if (ret) {
         goto ipmi_err;
     }
@@ -1026,10 +877,7 @@ static int __init as9947_36xkb_psu_init(void)
     return 0;
 
 ipmi_err:
-    while (i > 0) {
-        i--;
-        platform_device_unregister(data->pdev[i]);
-    }
+    platform_device_unregister(data->pdev);
 dev_reg_err:
     platform_driver_unregister(&as9947_36xkb_psu_driver);
 dri_reg_err:
@@ -1040,12 +888,8 @@ alloc_err:
 
 static void __exit as9947_36xkb_psu_exit(void)
 {
-    int i;
-
     ipmi_destroy_user(data->ipmi.user);
-    for (i = 0; i < NUM_OF_PSU; i++) {
-        platform_device_unregister(data->pdev[i]);
-    }
+    platform_device_unregister(data->pdev);
     platform_driver_unregister(&as9947_36xkb_psu_driver);
     kfree(data);
 }
