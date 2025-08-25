@@ -256,7 +256,6 @@ _onlp_fani_info_get_fan_on_psu(int pid, onlp_fan_info_t* info)
         info->rpm = 0;
         info->percentage = 0;
         info->status |= ONLP_FAN_STATUS_FAILED;
-        AIM_FREE_IF_PTR(str);
         return ONLP_STATUS_OK;
     }
     /* get fan direction */

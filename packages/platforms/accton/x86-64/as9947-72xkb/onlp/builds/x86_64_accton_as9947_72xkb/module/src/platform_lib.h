@@ -41,8 +41,8 @@
 #define PSU_STATUS_POWER_GOOD 1
 
 #define LED_FORMAT "/sys/devices/platform/as9947_72xkb_led/led_%s"
-#define PSU_SYSFS_FORMAT   "/sys/devices/platform/as9947_72xkb_psu.%d*psu%d_%s"
-#define PSU_SYSFS_FORMAT_1 "/sys/devices/platform/as9947_72xkb_psu.%d/hwmon/hwmon%d/%s"
+#define PSU_SYSFS_FORMAT   "/sys/devices/platform/as9947_72xkb_psu*psu%d_%s"
+#define PSU_SYSFS_FORMAT_1 "/sys/devices/platform/as9947_72xkb_psu/hwmon/hwmon%d/%s"
 #define FAN_SYSFS_FORMAT   "/sys/devices/platform/as9947_72xkb_fan*"
 #define FAN_SYSFS_FORMAT_1 "/sys/devices/platform/as9947_72xkb_fan/hwmon/hwmon%d/%s"
 #define SYS_LED_PATH   "/sys/devices/platform/as9947_72xkb_led/"
@@ -93,8 +93,8 @@ typedef enum as9947_72xkb_platform_id {
 enum onlp_fan_dir onlp_get_fan_dir(int fid);
 int onlp_get_psu_hwmon_idx(int pid);
 int onlp_get_fan_hwmon_idx(void);
-int psu_status_info_get(int id, char *node, int *value);
-int psu_status_string_get(int id, char *node, char **string);
+int psu_status_info_get(int pid, char *node, int *value);
+int psu_status_string_get(int pid, char *node, char **string);
 
 #define AIM_FREE_IF_PTR(p) \
     do \

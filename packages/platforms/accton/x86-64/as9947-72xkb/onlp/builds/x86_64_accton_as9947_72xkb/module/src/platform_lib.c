@@ -27,8 +27,6 @@
 #include <onlplib/file.h>
 #include "platform_lib.h"
 
-char psu_prefix[64];
-
 enum onlp_fan_dir onlp_get_fan_dir(int fid)
 {
     int len = 0;
@@ -68,12 +66,19 @@ int onlp_get_psu_hwmon_idx(int pid)
 {
     /* find hwmon index */
     char* file = NULL;
+    char path[64];
     int ret, hwmon_idx, max_hwmon_idx = 20;
 
     for (hwmon_idx = 0; hwmon_idx <= max_hwmon_idx; hwmon_idx++) {
-        snprintf(psu_prefix, sizeof(psu_prefix), "/sys/devices/platform/as9947_72xkb_psu.%d/hwmon/hwmon%d/", pid-1, hwmon_idx);
+        snprintf(path, sizeof(path), "/sys/devices/platform/as9947_72xkb_psu/hwmon/hwmon%d/", hwmon_idx);
 
-        ret = onlp_file_find(psu_prefix, "name", &file);
+        if (pid == 1)
+            ret = onlp_file_find(path, "psu1_present", &file);
+        else if (pid == 2)
+            ret = onlp_file_find(path, "psu2_present", &file);
+        else
+            return -1;
+
         AIM_FREE_IF_PTR(file);
 
         if (ONLP_STATUS_OK == ret)
@@ -103,46 +108,39 @@ int onlp_get_fan_hwmon_idx(void)
     return -1;
 }
 
-int psu_status_info_get(int id, char *node, int *value)
+int psu_status_info_get(int pid, char *node, int *value)
 {
     int ret = ONLP_STATUS_OK;
-    char path[128] = {0};
 
     *value = 0;
 
-    onlp_get_psu_hwmon_idx(id);
-
-    if (PSU1_ID == id) {
-        sprintf(path, "%s%s%s", psu_prefix, "psu1_", node);
-    }
-    else if (PSU2_ID == id) {
-        sprintf(path, "%s%s%s", psu_prefix, "psu2_", node);
-    }
-
-    if (onlp_file_read_int(value, path) < 0) {
-        AIM_LOG_ERROR("Unable to read status from file(%s)\r\n", path);
+    if (onlp_file_read_int(value, PSU_SYSFS_FORMAT, pid, node) < 0) {
+        AIM_LOG_ERROR("Unable to read status from pid(%d) node(%s)\r\n", pid, node);
         return ONLP_STATUS_E_INTERNAL;
     }
 
     return ret;
 }
 
-int psu_status_string_get(int id, char *node, char **string)
+int psu_status_string_get(int pid, char *node, char **string)
 {
     int ret = ONLP_STATUS_OK, len;
-    char path[128];
+    char file[32];
+    int hwmon_idx;
 
-    if (PSU1_ID == id) {
-        sprintf(path, "%s%s%s", psu_prefix, "psu1_", node);
+    hwmon_idx = onlp_get_psu_hwmon_idx(pid);
+    if (hwmon_idx >= 0) {
+        /* Read serial */
+        snprintf(file, sizeof(file), "psu%d_%s", pid, node);
+        len = onlp_file_read_str(string, PSU_SYSFS_FORMAT_1, hwmon_idx, file);
+        if (len < 3)
+        {
+            AIM_LOG_ERROR("Unable to read string from pid(%d) node(%s)\r\n", pid, node);
+            return ONLP_STATUS_E_INTERNAL;
+        }
     }
-    else if (PSU2_ID == id) {
-        sprintf(path, "%s%s%s", psu_prefix, "psu2_", node);
-    }
-
-    len = onlp_file_read_str(string, path);
-    if (len < 3)
-    {
-        AIM_LOG_ERROR("Unable to read status from file(%s)\r\n", path);
+    else {
+        AIM_LOG_ERROR("Unable to get hwmon index from pid(%d)\r\n", pid);
         return ONLP_STATUS_E_INTERNAL;
     }
 

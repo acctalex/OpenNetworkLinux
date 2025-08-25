@@ -81,6 +81,7 @@ class OnlPlatform_x86_64_accton_as9947_72xkb_r0(OnlPlatformAccton,
             return False
 
         self.modprobe('optoe')
+        self.modprobe('accton_ipmi_intf')
 
         for m in [ 'i2c-ocores', 'fpga', 'fan', 'psu', 'thermal', 'sys', 'leds']:
             self.insmod("x86-64-accton-as9947-72xkb-%s" % m)
