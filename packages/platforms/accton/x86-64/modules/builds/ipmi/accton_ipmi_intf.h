@@ -16,7 +16,6 @@
  * Description:
  *  IPMI driver related interface declarations
  */
-
 #ifndef ACCTON_IPMI_INTF_H
 #define ACCTON_IPMI_INTF_H
 
@@ -52,7 +51,7 @@ struct ipmi_data {
  * @param dev: Device structure for logging errors.
  * @return 0 on success, or an error code on failure.
  */
-extern int init_ipmi_data(struct ipmi_data *ipmi, int iface, struct device *dev);
+extern int init_ipmi_data(struct ipmi_data *ipmi, int iface, struct device *dev) __attribute__((weak));
 
 /* 
  * Send an IPMI command to the IPMI device and receive the response.
@@ -67,6 +66,6 @@ extern int init_ipmi_data(struct ipmi_data *ipmi, int iface, struct device *dev)
  */
 extern int ipmi_send_message(struct ipmi_data *ipmi, unsigned char cmd,
                              unsigned char *tx_data, unsigned short tx_len,
-                             unsigned char *rx_data, unsigned short rx_len);
+                             unsigned char *rx_data, unsigned short rx_len) __attribute__((weak));
 
 #endif /* ACCTON_IPMI_INTF_H */
