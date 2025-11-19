@@ -26,6 +26,8 @@
 #ifndef __PLATFORM_LIB_H__
 #define __PLATFORM_LIB_H__
 
+#include <unistd.h>
+#include <pthread.h>
 #include "x86_64_accton_as9737_32db_log.h"
 
 #define CHASSIS_FAN_COUNT      6
@@ -49,9 +51,10 @@
 #define FAN_SYSFS_FORMAT_1 "/sys/devices/platform/as9737_32db_fan/hwmon/hwmon%d/%s"
 #define SYS_LED_PATH       "/sys/devices/platform/as9737_32db_led/"
 #define IDPROM_PATH        "/sys/devices/platform/as9737_32db_sys/eeprom"
+#define BMC_THERMAL_DATA_PATH   "/sys/devices/platform/as9737_32db_sys/bmc_thermal_data"
 #define BIOS_VER_PATH  "/sys/devices/virtual/dmi/id/bios_version"
-#define BMC_VER1_PATH  "/sys/devices/platform/ipmi_bmc.0/firmware_revision"
-#define BMC_VER2_PATH  "/sys/devices/platform/ipmi_bmc.0/aux_firmware_revision"
+#define BMC_VER1_PATH  "/sys/bus/platform/drivers/ipmi_si/IPI0001:00/bmc/firmware_revision"
+#define BMC_VER2_PATH  "/sys/bus/platform/drivers/ipmi_si/IPI0001:00/bmc/aux_firmware_revision"
 
 enum onlp_thermal_id {
 	THERMAL_RESERVED = 0,
@@ -99,6 +102,7 @@ int onlp_get_psu_hwmon_idx(int pid);
 int onlp_get_fan_hwmon_idx(void);
 psu_type_t get_psu_type(int id, char* modelname, int modelname_len);
 int psu_status_info_get(int id, char *node, int *value);
+int get_bmc_version(int *ver);
 
 #define AIM_FREE_IF_PTR(p) \
 	do \
