@@ -42,11 +42,14 @@
 
 #define IPMI_SYSEEPROM_READ_CMD 0x18
 #define IPMI_CPLD_VER_READ_CMD 0x20
+#define IPMI_SEND_THERMAL_DATA_CMD 0x13
 
 static int as9957_32db_sys_probe(struct platform_device *pdev);
 static int as9957_32db_sys_remove(struct platform_device *pdev);
 static ssize_t show_version(struct device *dev,
                                 struct device_attribute *da, char *buf);
+static ssize_t set_bmc_thermal_data(struct device *dev, struct device_attribute *da,
+                const char *buf, size_t count);
 
 struct as9957_32db_sys_data {
     struct platform_device *pdev;
@@ -76,18 +79,21 @@ enum as9957_32db_sys_sysfs_attrs {
     FPGA_VER, /* FPGA version */
     DC_SCM_CPLD_VER,
     SYS_CPLD_VER,
+    THERMAL_DATA,
 };
 
 static SENSOR_DEVICE_ATTR(come_cpld_version, S_IRUGO, show_version, NULL, COME_CPLD_VER);
 static SENSOR_DEVICE_ATTR(fpga_version, S_IRUGO, show_version, NULL, FPGA_VER);
 static SENSOR_DEVICE_ATTR(dc_scm_cpld_version, S_IRUGO, show_version, NULL, DC_SCM_CPLD_VER);
 static SENSOR_DEVICE_ATTR(sys_cpld_version, S_IRUGO, show_version, NULL, SYS_CPLD_VER);
+static SENSOR_DEVICE_ATTR(bmc_thermal_data, S_IWUSR, NULL, set_bmc_thermal_data, THERMAL_DATA);
 
 static struct attribute *as9957_32db_sys_attributes[] = {
     &sensor_dev_attr_come_cpld_version.dev_attr.attr,
     &sensor_dev_attr_fpga_version.dev_attr.attr,
     &sensor_dev_attr_dc_scm_cpld_version.dev_attr.attr,
     &sensor_dev_attr_sys_cpld_version.dev_attr.attr,
+    &sensor_dev_attr_bmc_thermal_data.dev_attr.attr,
     NULL
 };
 
@@ -284,6 +290,59 @@ static ssize_t show_version(struct device *dev,
 exit:
     mutex_unlock(&data->update_lock);
     return error;
+}
+
+static ssize_t set_bmc_thermal_data(struct device *dev, struct device_attribute *da,
+                const char *buf, size_t count)
+{
+    int status;
+    int args;
+    char *opt, tmp[32] = {0};
+    char *tmp_p;
+    size_t copy_size;
+    u8 input[3] = {0};
+
+    copy_size = (count < sizeof(tmp)) ? count : sizeof(tmp) - 1;
+    #ifdef __STDC_LIB_EXT1__
+    memcpy_s(tmp, copy_size, buf, copy_size);
+    #else
+    memcpy(tmp, buf, copy_size);
+    #endif
+    tmp[copy_size] = '\0';
+
+    args = 0;
+    tmp_p = strim(tmp);
+    while (args < 3 && (opt = strsep(&tmp_p, " ")) != NULL) {
+        if (kstrtou8(opt, 10, &input[args]) == 0) {
+            args++;
+        }
+    }
+    if (args != 3) {
+        return -EINVAL;
+    }
+
+    mutex_lock(&data->update_lock);
+
+    data->ipmi_tx_data[0] = input[0];
+    data->ipmi_tx_data[1] = input[1];
+    data->ipmi_tx_data[2] = input[2];
+    status = ipmi_send_message(&data->ipmi, IPMI_SEND_THERMAL_DATA_CMD,
+                data->ipmi_tx_data, 3,
+                NULL, 0);
+
+    if (unlikely(status != 0))
+        goto exit;
+
+    if (unlikely(data->ipmi.rx_result != 0)) {
+        status = -EINVAL;
+        goto exit;
+    }
+
+    status = count;
+
+exit:
+    mutex_unlock(&data->update_lock);
+    return status;
 }
 
 static int as9957_32db_sys_probe(struct platform_device *pdev)

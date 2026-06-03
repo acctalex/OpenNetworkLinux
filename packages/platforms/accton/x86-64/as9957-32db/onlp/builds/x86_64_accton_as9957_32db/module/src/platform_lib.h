@@ -48,6 +48,8 @@
 #define FAN_SYSFS_FORMAT_1 "/sys/devices/platform/as9957_32db_fan/hwmon/hwmon%d/%s"
 #define SYS_LED_PATH   "/sys/devices/platform/as9957_32db_led/"
 #define IDPROM_PATH "/sys/devices/platform/as9957_32db_sys/eeprom"
+#define CPLD_REG_PATH "/sys/devices/platform/as9957_32db_fpga/cpld%d_reg"
+#define BMC_THERMAL_DATA_PATH   "/sys/devices/platform/as9957_32db_sys/bmc_thermal_data"
 #define FPGA_VER_PATH  "/sys/devices/platform/as9957_32db_sys/fpga_version"
 #define BMC_VER1_PATH  "/sys/bus/platform/drivers/ipmi_si/IPI0001:00/bmc/firmware_revision"
 #define BMC_VER2_PATH  "/sys/bus/platform/drivers/ipmi_si/IPI0001:00/bmc/aux_firmware_revision"
