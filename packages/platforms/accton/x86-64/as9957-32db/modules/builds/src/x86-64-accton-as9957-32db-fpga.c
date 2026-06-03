@@ -51,7 +51,6 @@
 #define FPGA_PCI_VENDOR_ID             0x10ee
 #define FPGA_PCI_DEVICE_ID             0x7021
 
-#define FPGA_PCIE_START_OFFSET         0x0000
 #define FPGA_MAJOR_VER_REG             0x01
 #define FPGA_MINOR_VER_REG             0x02
 #define SPI_BUSY_MASK_CPLD1            0x01
@@ -102,9 +101,6 @@
  *       macro define
  * *********************************************/
 #define pcie_err(fmt, args...) \
-        printk(KERN_ERR "["DRVNAME"]: " fmt " ", ##args)
-
-#define pcie_info(fmt, args...) \
         printk(KERN_ERR "["DRVNAME"]: " fmt " ", ##args)
 
 /***********************************************
@@ -564,9 +560,8 @@ static ssize_t status_read(struct device *dev, struct device_attribute *da, char
         case MODULE_PRESENT_1 ... MODULE_RX_LOS_36:
             reg = attribute_mappings[attr->index].reg;
             mutex_lock(&fpga_ctl->access_lock);
-            if ((reg & 0xF000) == CPLD1_PCIE_START_OFFSET) {
-                reg_val = fpga_read(fpga_ctl->pci_fpga_dev.data_base_addr0 + reg);
-            } else if ((reg & 0xF000) == CPLD2_PCIE_START_OFFSET) {
+            if (((reg & 0xF000) == CPLD1_PCIE_START_OFFSET) || 
+                ((reg & 0xF000) == CPLD2_PCIE_START_OFFSET)) {
                 reg_val = fpga_read(fpga_ctl->pci_fpga_dev.data_base_addr0 + reg);
             }
             mutex_unlock(&fpga_ctl->access_lock);
@@ -609,9 +604,8 @@ static ssize_t status_write(struct device *dev, struct device_attribute *da,
     }
 
     reg = attribute_mappings[attr->index].reg;
-    if ((reg & 0xF000) == CPLD1_PCIE_START_OFFSET) {
-        addr = fpga_ctl->pci_fpga_dev.data_base_addr0;
-    } else if ((reg & 0xF000) == CPLD2_PCIE_START_OFFSET) {
+    if (((reg & 0xF000) == CPLD1_PCIE_START_OFFSET) || 
+        ((reg & 0xF000) == CPLD2_PCIE_START_OFFSET)) {
         addr = fpga_ctl->pci_fpga_dev.data_base_addr0;
     }
     bit_mask = 0x01 << (attr->index - attribute_mappings[attr->index].attr_base);

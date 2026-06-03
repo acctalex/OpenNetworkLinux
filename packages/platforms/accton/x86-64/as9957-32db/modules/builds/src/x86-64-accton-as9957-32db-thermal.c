@@ -43,10 +43,6 @@
 
 static ssize_t show_temp(struct device *dev, struct device_attribute *attr,
     char *buf);
-#ifdef ENABLE_THRESHOLD
-static ssize_t show_threshold(struct device *dev, struct device_attribute *da,
-    char *buf);
-#endif
 static int as9957_32db_thermal_probe(struct platform_device *pdev);
 static int as9957_32db_thermal_remove(struct platform_device *pdev);
 
@@ -67,21 +63,6 @@ struct as9957_32db_thermal_data {
     struct ipmi_data ipmi;
     unsigned char ipmi_tx_data[2];  /* 0: thermal id, 1: temp */
 };
-
-#ifdef ENABLE_THRESHOLD
-static s8 temp_max_alarm[THERMAL_COUNT] = { 85, 85, 85, 79, 92, 85, 92, 92,
-                                            85, 85, 85, 79, 92, 85, 92, 92,
-                                            85, 85, 85, 79, 92, 85, 92, 92};
-static s8 temp_max[THERMAL_COUNT] = { 80, 80, 80, 74, 87, 80, 87, 87,
-                                      80, 80, 80, 74, 87, 80, 87, 87,
-                                      80, 80, 80, 74, 87, 80, 87, 87 };
-static s8 temp_min[THERMAL_COUNT] = { -45, -45, -45, -45, -45, -45, -45, -45,
-                                      -45, -45, -45, -45, -45, -45, -45, -45,
-                                      -45, -45, -45, -45, -45, -45, -45, -45 };
-static s8 temp_min_alarm[THERMAL_COUNT] = { -50, -50, -50, -50, -50, -50, -50, -50,
-                                            -50, -50, -50, -50, -50, -50, -50, -50,
-                                            -50, -50, -50, -50, -50, -50, -50, -50 };
-#endif
 
 struct as9957_32db_thermal_data *data = NULL;
 
@@ -217,34 +198,12 @@ enum as9957_32db_thermal_sysfs_attrs {
     TEMP24_MIN_ALARM,
 };
 
-#ifdef ENABLE_THRESHOLD
-// Read only temp_input
-#define DECLARE_THERMAL_SENSOR_DEVICE_ATTR(index) \
-    static SENSOR_DEVICE_ATTR(temp##index##_input, S_IRUGO, show_temp, \
-                    NULL, TEMP##index##_INPUT); \
-    static SENSOR_DEVICE_ATTR(temp##index##_crit, S_IRUGO, show_threshold,\
-                    NULL, TEMP##index##_MAX_ALARM); \
-    static SENSOR_DEVICE_ATTR(temp##index##_max, S_IRUGO, show_threshold,\
-                    NULL, TEMP##index##_MAX); \
-    static SENSOR_DEVICE_ATTR(temp##index##_min, S_IRUGO, show_threshold,\
-                    NULL, TEMP##index##_MIN); \
-    static SENSOR_DEVICE_ATTR(temp##index##_lcrit, S_IRUGO, show_threshold,\
-                    NULL, TEMP##index##_MIN_ALARM)
-
-#define DECLARE_THERMAL_ATTR(index) \
-    &sensor_dev_attr_temp##index##_input.dev_attr.attr, \
-    &sensor_dev_attr_temp##index##_crit.dev_attr.attr, \
-    &sensor_dev_attr_temp##index##_max.dev_attr.attr, \
-    &sensor_dev_attr_temp##index##_min.dev_attr.attr, \
-    &sensor_dev_attr_temp##index##_lcrit.dev_attr.attr
-#else
 #define DECLARE_THERMAL_SENSOR_DEVICE_ATTR(index) \
     static SENSOR_DEVICE_ATTR(temp##index##_input, S_IRUGO, show_temp, \
                     NULL, TEMP##index##_INPUT); 
 
 #define DECLARE_THERMAL_ATTR(index) \
     &sensor_dev_attr_temp##index##_input.dev_attr.attr
-#endif
 
 DECLARE_THERMAL_SENSOR_DEVICE_ATTR(1);
 DECLARE_THERMAL_SENSOR_DEVICE_ATTR(2);
@@ -299,42 +258,6 @@ static struct attribute *as9957_32db_thermal_attrs[] = {
     NULL
 };
 ATTRIBUTE_GROUPS(as9957_32db_thermal);
-
-#ifdef ENABLE_THRESHOLD
-static ssize_t show_threshold(struct device *dev, struct device_attribute *da,
-                            char *buf)
-{
-    int status = 0;
-    struct sensor_device_attribute *attr = to_sensor_dev_attr(da);
-
-    mutex_lock(&data->update_lock);
-
-    switch (attr->index) {
-    case TEMP1_MAX_ALARM ... TEMP24_MAX_ALARM:
-        status = (int)temp_max_alarm[attr->index - TEMP1_MAX_ALARM];
-        break;
-    case TEMP1_MAX ... TEMP24_MAX:
-        status = (int)temp_max[attr->index - TEMP1_MAX];
-        break;
-    case TEMP1_MIN ... TEMP24_MIN:
-        status = (int)temp_min[attr->index - TEMP1_MIN];
-        break;
-    case TEMP1_MIN_ALARM ... TEMP24_MIN_ALARM:
-        status = (int)temp_min_alarm[attr->index - TEMP1_MIN_ALARM];
-        break;
-    default:
-        status = -EINVAL;
-        goto exit;
-    }
-
-    mutex_unlock(&data->update_lock);
-    return sprintf(buf, "%d\n", status * 1000);
-
-exit:
-    mutex_unlock(&data->update_lock);
-    return status;
-}
-#endif
 
 static ssize_t show_temp(struct device *dev, struct device_attribute *da,
                             char *buf)

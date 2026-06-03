@@ -662,7 +662,7 @@ static ssize_t show_psu(struct device *dev, struct device_attribute *da,
         if (value == 0) {
             value = psu_lookup_max_fan_speed(data->ipmi_resp[pid].model);
         }
-	break;
+        break;
     default:
         error = -EINVAL;
         goto exit;

@@ -106,12 +106,6 @@ onlp_sfpi_is_present(int port)
 int
 onlp_sfpi_eeprom_read(int port, uint8_t data[256])
 {
-    /*
-     * Read the SFP eeprom into data[]
-     *
-     * Return MISSING if SFP is missing.
-     * Return OK if eeprom is read
-     */
     int size = 0;
     memset(data, 0, 256);
 
@@ -213,7 +207,7 @@ onlp_sfpi_control_set(int port, onlp_sfp_control_t control, int value)
         VALIDATE_QSFP(port);
 
         if (onlp_file_write_int(value, MODULE_LPMODE_FORMAT, port) < 0) {
-            AIM_LOG_ERROR("Unable to write reset status to port(%d)\r\n", port);
+            AIM_LOG_ERROR("Unable to write lp_mode status to port(%d)\r\n", port);
             return ONLP_STATUS_E_INTERNAL;
         }
 
@@ -277,7 +271,7 @@ onlp_sfpi_control_get(int port, onlp_sfp_control_t control, int* value)
         VALIDATE_QSFP(port);
 
         if (onlp_file_read_int(value, MODULE_LPMODE_FORMAT, port) < 0) {
-            AIM_LOG_ERROR("Unable to read reset status from port(%d)\r\n", port);
+            AIM_LOG_ERROR("Unable to read lp_mode status from port(%d)\r\n", port);
             return ONLP_STATUS_E_INTERNAL;
         }
 
